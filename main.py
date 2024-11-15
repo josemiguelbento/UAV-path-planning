@@ -6,52 +6,19 @@ from algorithms import *
 import time
 from datetime import datetime
 
-def main(save_fig = 0, fig_name = 'result'):
-    #number_uavs = 1
-    #energy_uavs = [1000]
-    #initial_positions = [[14, 5]]
-    
-    #number_uavs = 2
-    #energy_uavs = [4000, 4000]
-    #energy_uavs = [2000, 2000]
-    initial_positions = []
-    #initial_positions = [[2, 1], [14, 2]] #, [14,2]]
-    
-    #For the simple square
-    #energy_uavs = [100, 100]
-    #initial_positions = [[3,7], [7,1]]
-    
-    #initial_positions = [[5,7], [7,1]]
-    
-    #energy_uavs = [2000, 2000]
-    #initial_positions = [[9,18],[18,7]]#[[30,26],[22,30]] #[[26,10],[22,30]] #[[9,18],[18,7]]#[[9, 9], [9, 9]]#[[30,11],[14,27]]#[[9, 9], [9, 9]] #[[30,11],[14,27]]
-    #initial_positions = []
+def main(algorithm, save_res, filename):
+
+    #Define the number of available UAVs
     number_uavs = 5
+    
+    #Define the energy available to each UAV
     energy_uavs = [2000, 2000, 2000, 2000, 2000]
-    
-    #number_uavs = 6
-    #energy_uavs = [2000, 2000, 2000, 2000, 2000, 2000]
-    #energy_uavs = [1580, 1580, 1580, 1580, 1580, 1580]
-    
-    #number_uavs = 7
-    #energy_uavs = [2000, 2000, 2000, 2000, 2000, 2000, 2000]
-    
-    #number_uavs = 12
-    #energy_uavs = [1000 for _ in range(12)]
-    
-    #number_uavs = 14
-    #energy_uavs = [1000 for _ in range(14)]
-    
-    #energy_uavs = [1500, 1500, 1500]
-    #initial_positions = [[14, 5], [9, 9], [9,15]]
-    
-    #initial_positions = [[2, 1],[2, 1]]
+
     #sensor data from a DJI phantom 4 pro
     hfov = 84 #field of view in degrees
     h_sensor = 50 #meters
     p_o = 50 #percentage of overlap
     pod = 0.63
-    #num_pixels = 5472 #pixels horizontally
     
     #grid size calculation
     d = 2*(1-p_o/100)*h_sensor*math.tan(hfov/2) #as per eq 3.1 in PAer report
@@ -74,98 +41,24 @@ def main(save_fig = 0, fig_name = 'result'):
     CG_grid, m = define_initial_grid(mission.AOI_vertices, mission.d, True)
     x_lims = (CG_grid[0] - m*mission.d/2, CG_grid[0] + m*mission.d/2)
     y_lims = (CG_grid[1] - m*mission.d/2, CG_grid[1] + m*mission.d/2)
-    
-    random.seed(3)
-    
+        
     start = time.time()
     start_process = time.process_time()
     
-    #cell_centers = calculate_poc(cell_centers, 1500, 1500, 1000, 1000, True)
 
-    """
-    boust = Boustrophedon_algorithm(cell_centers,d,[NFZ_edges], 1000)
-    boust.run_algorithm(save_fig, fig_name)
-    path = boust.path
-    """
-    
-    #"""
-    #cell_centers = calculate_poc(cell_centers, 1500, 1500, 1000, 1000, True)
-    att = Attraction_algorithm(cell_centers,d,[], energy_uavs, number_uavs, initial_positions, pod)
-    att.run_algorithm(save_fig, fig_name)
-    paths = att.paths
-    #cell_centers, sx, sy, theta = mission.generate_optimal_grid()
-    
-    #path_idx = [224, 257, 291, 325, 357, 392, 424, 454, 487, 519, 551, 583, 612, 638, 637, 664, 692, 693, 724, 723, 752, 725, 694, 667, 695, 726, 753, 778, 777, 776, 751, 750, 749, 720, 719, 747, 774, 775, 798, 773, 748, 721, 722, 691, 665, 639, 666, 640, 668, 642, 615, 585, 553, 554, 522, 489, 457, 458, 429, 430, 431, 460, 492, 523, 524, 491, 459, 490, 521, 555, 556, 557, 525, 493, 461, 462, 463, 464, 465, 432, 402, 370, 337, 307, 306, 273, 241, 272, 240, 207, 171, 208, 209, 242, 210, 211, 174, 173, 139, 172, 138, 105, 106, 140, 141, 175, 212, 213, 245, 277, 276, 244, 243, 275, 274, 308, 338, 309, 310, 340, 374, 407, 438, 472, 473, 439, 440, 474, 506, 538, 537, 505, 536, 504, 471, 503, 535, 568, 534, 567, 600, 599, 625, 654, 655, 656, 683, 684, 657, 629, 603, 630, 658, 685, 686, 659, 632, 605, 572, 571, 539, 507, 475, 476, 508, 509, 541, 540, 573, 606, 631, 604, 570, 569, 602, 628, 627, 601, 626, 653, 680, 681, 708, 739, 738, 766, 765, 791, 792, 816, 815, 840, 864, 865, 841, 814, 790, 764, 735, 734, 762, 761, 787, 788, 812, 839, 863, 862, 880, 879, 878, 861, 837, 811, 838, 813, 789, 763, 736, 737, 707, 706, 705, 679, 652, 624, 598, 597, 596, 595, 594, 560, 559, 558, 590, 621, 649, 676, 703, 730, 758, 759, 785, 809, 786, 810, 836, 835, 860]
-    #path = [att.valid_cell_list[idx] for idx in path_idx]
-    
-    #print(sum(cell.poc for cell in att.valid_cell_list))
-    #print(len(att.valid_cell_list))
-    #print(min(cell.poc for cell in att.valid_cell_list))
-    #"""
-    
-    """
-    #Calculating the average of boustrophedon performance if randomized initial positions
-    valid_cell_list = [cell for cell in copy.deepcopy(cell_centers) if cell.status == 1]
-    random_init_idx = []
-    for i in range(number_uavs):
-        random_init_idx.append(random.choices(range(len(valid_cell_list)), k=100))
-    detect = []
-    eds = []
-    j_list = []
-    for i in range(100):
-        init_pos = [[valid_cell_list[random_init_idx[uav][i]].i, valid_cell_list[random_init_idx[uav][i]].j] for uav in range(number_uavs)]
-        #cell_centers = calculate_poc(cell_centers, 1500, 1500, 1000, 1000, True)
-        att = Attraction_algorithm(cell_centers,d,[], energy_uavs, number_uavs, init_pos)
-        att.run_algorithm(save_fig, fig_name)
+    if algorithm == 'UninfAtt':
+        pass
+    elif algorithm == 'Att':
+        att = Attraction_algorithm(cell_centers,d, energy_uavs, number_uavs, pod)
+        att.generate_uav_path()
         paths = att.paths
-        #cell_centers = calculate_poc(cell_centers, 1500, 1500, 1000, 1000)
-        #cell_centers = calculate_poc_v2(cell_centers, x0_list, y0_list, sigma_x_list, sigma_y_list)
-        J, D, ADS = evaluate_paths_multi(paths, cell_centers, save_fig, fig_name)
-        j_list.append(J)
-        detect.append(D)
-        eds.append(ADS)
-    print("average D:", sum(detect)/len(detect))
-    print("average EDS:", sum(eds)/len(eds))
-    print("average J:", sum(j_list)/len(j_list))
-    """
-    
-    #SA = SimulatedAnnealing_v2(cell_centers, d, 1000, 1, 2, 0) #cell_list, d, initial_energy, type_init, number_threads, synchronism = 0, initial_cell_pos = [6,5]
-    #path = SA.initial_guess_list[1]
-        
-    """
-    minlp = MINLP_solver2(initial_path, att.valid_cell_list, cell_centers, 50, d)
-    minlp.initialize_variables()
-    path = minlp.optimize_path()
-    #path = initial_path[0:8]
-    """
-    
-    """
-    graph_search = Graph_search_algorithm(cell_centers,d,[NFZ_edges], 4000)
-    graph_search.run_algorithm()
-    """
-    
-    """
-    graph_search = A_star_search_algorithm(cell_centers,d, 1000)
-    graph_search.generate_uav_path(save_fig, fig_name)
-    path = graph_search.path
-    #initial_path = graph_search.path
-    #path = initial_path
-    """
-    
-    """
-    GA = GeneticAlgorithm(cell_centers,d,[NFZ_edges], 50)
-    path = GA.run_algorithm()
-    """
-    """
-    #initial_path = []
-    SA = SimulatedAnnealing(cell_centers, d, 1000, initial_path)
-    SA.create_adjacency_dict()
-    #random.seed(1)
-    #SA.random_walk_initial_guess()
-    random.seed(time.time())
-    SA.generate_uav_path()
-    path = SA.path
-    """
+    elif algorithm == 'SA':
+        pass
+    elif algorithm == 'ACO':
+        pass
+    elif algorithm == 'MCTS':
+        pass
+
     
     """
     #initial_path = []
@@ -182,185 +75,13 @@ def main(save_fig = 0, fig_name = 'result'):
     paths = SA.paths
     #print(SA.paths_idx)
     """
-    
-    """
-    #Exemplify the path changes
-    random.seed(8)
-    SA = SimulatedAnnealing_v2(cell_centers, d, 0, 15, 0, energy_uavs, number_uavs, initial_positions, pod, True)
-    original = copy.deepcopy(SA.get_indexes(SA.initial_guess_list[0]))
-    #original[1].pop(4)
-    candidate = copy.deepcopy(original)
-    for i in range(0,1):
-        #candidate[0] = SA.remove_node_mid(candidate[0])
-        #candidate[0] = SA.adjust_path_batt(candidate[0],0)
-        
-        #candidate[0] = SA.change_node_position(candidate[0])
-        #candidate[0] = SA.adjust_path_batt(candidate[0],0)
-        
-        candidate[0] = SA.add_node_mid(candidate[0])
-        candidate[0] = SA.adjust_path_batt(candidate[0],0)
-        
-        #candidate = SA.remove_path_crossing(candidate, 0)
-        
-        #candidate = SA.remove_path_crossing(candidate, 1)
-        
-        #candidate[0][6:] = original[1][3:]
-        #candidate[1][3:] = original[0][6:]
-        #candidate[0] = SA.adjust_path_batt(candidate[0], 0)
-        #candidate[1] = SA.adjust_path_batt(candidate[1], 1)
-        
-        #new_start = 2
-        #neighbour = copy.deepcopy(candidate[1][new_start:])
-        #neighbour = neighbour + [11, 3, 4, 13]
-        #neighbour = SA.adjust_path_batt(neighbour, 1)
-        #candidate[1] = neighbour
-        
-        
-    
-    #differences0 = [candidate[0][step] == original[0][step] for step in range(len(candidate[0]))]
-    #candidate_path = [SA.valid_cell_list[idx] for idx in candidate[0]]
-    #x_coords0 = [cell.x for cell, diff in zip(candidate_path, differences0) if not diff]
-    #y_coords0 = [cell.y for cell, diff in zip(candidate_path, differences0) if not diff]
-    
-    #differences1 = [candidate[1][step] == original[1][step] for step in range(len(candidate[1]))]
-    #candidate_path = [SA.valid_cell_list[idx] for idx in candidate[1]]
-    #x_coords1 = [cell.x for cell, diff in zip(candidate_path, differences1) if not diff]
-    #y_coords1 = [cell.y for cell, diff in zip(candidate_path, differences1) if not diff]
-    
-    original_path = [SA.valid_cell_list[idx] for idx in original[0]]
-    x_coords_original0 = [cell.x for cell in original_path]
-    y_coords_original0 = [cell.y for cell in original_path]
-    original_path = [SA.valid_cell_list[idx] for idx in original[1]]
-    x_coords_original1 = [cell.x for cell in original_path]
-    y_coords_original1 = [cell.y for cell in original_path]
-    
-    fig,ax = plt.subplots()
-    #AOI_patch = ptch.Polygon(mission.AOI_vertices, alpha=0.2)#, label = 'AOI')
-    #for vert in mission.NFZ_vertices:
-    #    NFZ_patch = ptch.Polygon(vert, alpha=0.2, facecolor = 'r')
-    #    ax.add_patch(NFZ_patch)
-    #ax.add_patch(AOI_patch)
-    plot_grid(cell_centers, d, ax)
-    plt.xlabel("x (m)")
-    plt.ylabel("y (m)")
-    plt.plot(x_coords_original0[0], y_coords_original0[0], 'o', color= 'green')
-    plt.plot(x_coords_original0, y_coords_original0, '-', color= 'green')
-    #plt.plot(x_coords_original1[0], y_coords_original1[0], 'o', color= 'red')
-    #plt.plot(x_coords_original1, y_coords_original1, '-', color= 'red')
-    #plt.plot(x_coords0, y_coords0, '-', color= 'orange')
-    #plt.plot(x_coords1, y_coords1, '-', color= 'deeppink')
-    plt.xlim(0, 1000)
-    plt.ylim(0, 1000)
-    fig.set_size_inches(4, 4)
-    #plt.savefig('./other_figures/neighbor_change_init_pos_before.pdf', format = "pdf", bbox_inches='tight')
-    #plt.title("Original path")
-    #plt.savefig('./other_figures/original_green_path.png', format = "png", bbox_inches='tight')
-    
-    candidate_path = [SA.valid_cell_list[idx] for idx in candidate[0]]
-    x_coords_candidate0 = [cell.x for cell in candidate_path]
-    y_coords_candidate0 = [cell.y for cell in candidate_path]
-    candidate_path = [SA.valid_cell_list[idx] for idx in candidate[1]]
-    x_coords_candidate1 = [cell.x for cell in candidate_path]
-    y_coords_candidate1 = [cell.y for cell in candidate_path]
-    
-    #x_coords_candidate0[-1] = x_coords_candidate0[-1]-2*d
-    
-    
-    fig2,ax2 = plt.subplots()
-    #AOI_patch = ptch.Polygon(mission.AOI_vertices, alpha=0.2)#, label = 'AOI')
-    #for vert in mission.NFZ_vertices:
-    #    NFZ_patch = ptch.Polygon(vert, alpha=0.2, facecolor = 'r')
-    #    ax2.add_patch(NFZ_patch)
-    #ax2.add_patch(AOI_patch)
-    plot_grid(cell_centers, d, ax2)
-    plt.xlabel("x (m)")
-    plt.ylabel("y (m)")
-    plt.plot(x_coords_candidate0[0], y_coords_candidate0[0], 'o', color= 'green')
-    plt.plot(x_coords_candidate0, y_coords_candidate0, '-', color= 'green')
-    #plt.plot(x_coords_candidate1[0], y_coords_candidate1[0], 'o', color= 'red')
-    #plt.plot(x_coords_candidate1, y_coords_candidate1, '-', color= 'red')
-    plt.xlim(0, 1000)
-    plt.ylim(0, 1000)
-    fig2.set_size_inches(4, 4)
-    #plt.savefig('./other_figures/neighbor_change_init_pos_after.pdf', format = "pdf", bbox_inches='tight')
-    plt.title("After adding a step")
-    plt.savefig('./other_figures/neighbor_add_step_only_green.png', format = "png", bbox_inches='tight')
-    plt.show()
-    exit()
 
-    """
-    
-    """
-    #initial_path = []
-    SA = SimulatedAnnealing_v2_pareto(cell_centers, d, 1000, 1, 15, 0) #cell_list, d, initial_energy, type_init, number_threads, synchronism = 0, initial_cell_pos = [6,5]
-    SA.create_adjacency_dict()
-    SA.L_k = 1000
-    #SA.initial_temp = 0.0004#0.0004#0.0085#0.002526 #5e-5
-    #SA.cooling_factor = 0.96
-    #SA.cooling_factor = 0.96#0.99
-    #SA.final_temp = 2.755e-06 #2.755e-7
-    #SA.max_n_iter = 100
-    #random.seed(time.time())
-    SA.generate_uav_path(save_fig, fig_name)
-    #path = SA.path
-    #print(SA.overall_pareto_set)
-    plt.figure(figsize=(10,8))
-    if SA.synchronism == 0:
-        for thread in range(SA.number_threads):
-            SA.plot_pareto(SA.threads_pareto_sets[thread], 'thread '+ str(thread))
-        SA.plot_pareto(SA.overall_pareto_set, 'overall')
-    else:
-        SA.plot_pareto(SA.overall_pareto_set, 'no sync')
-    """
-    
-    """
-    plt.figure(figsize=(10,8))
-    SA1 = SimulatedAnnealing_v2_pareto(cell_centers, d, 4000, 0, 15, 0) #cell_list, d, initial_energy, type_init, number_threads, synchronism = 0, initial_cell_pos = [6,5]
-    SA1.create_adjacency_dict()
-    SA1.L_k = 1000
-    SA1.generate_uav_path(save_fig, fig_name)
-    SA1.plot_pareto(SA1.overall_pareto_set, 'Att no sync')
-    
-    SA2 = SimulatedAnnealing_v2_pareto(cell_centers, d, 4000, 0, 15, 1) #cell_list, d, initial_energy, type_init, number_threads, synchronism = 0, initial_cell_pos = [6,5]
-    SA2.create_adjacency_dict()
-    SA2.L_k = 1000
-    SA2.generate_uav_path(save_fig, fig_name)
-    SA2.plot_pareto(SA2.overall_pareto_set, 'Att with sync')
-    
-    SA3 = SimulatedAnnealing_v2_pareto(cell_centers, d, 4000, 1, 15, 0) #cell_list, d, initial_energy, type_init, number_threads, synchronism = 0, initial_cell_pos = [6,5]
-    SA3.create_adjacency_dict()
-    SA3.L_k = 1000
-    SA3.generate_uav_path(save_fig, fig_name)
-    SA3.plot_pareto(SA3.overall_pareto_set, 'RW no sync')
-    
-    SA4 = SimulatedAnnealing_v2_pareto(cell_centers, d, 4000, 1, 15, 1) #cell_list, d, initial_energy, type_init, number_threads, synchronism = 0, initial_cell_pos = [6,5]
-    SA4.create_adjacency_dict()
-    SA4.L_k = 1000
-    SA4.generate_uav_path(save_fig, fig_name)
-    SA4.plot_pareto(SA4.overall_pareto_set, 'RW with sync')
-    """
-    
-    #ACO = AntColonyOpt(cell_centers, d, 1000, 1, 1)
-    #ACO.generate_uav_path(save_fig, fig_name)
-    #path = ACO.path
-    
     """
     MCS = MonteCarloSearch(cell_centers, d, energy_uavs, number_uavs, pod)
     MCS.c = 1e-12 #1.399e-5
     MCS.generate_path(200, save_fig, fig_name)
     paths = MCS.paths
     """
-    
-    """
-    MCS = MonteCarloSearch_MAB(cell_centers, d, energy_uavs, number_uavs, pod)
-    MCS.generate_path(1000, save_fig, fig_name)
-    paths = MCS.paths
-    """
-    
-    
-    #aco = ACO_v2(cell_centers, d, 1, energy_uavs, number_uavs)
-    #paths = aco.generate_paths()
-    
     
     """
     aco = AntColonyOpt_v2(cell_centers, d, energy_uavs, number_uavs, pod)
@@ -427,7 +148,7 @@ def main(save_fig = 0, fig_name = 'result'):
     #plt.subplots_adjust(left=0.32)
     
     #path = initial_path
-    J, D, ADS = evaluate_paths_multi(paths, cell_centers, pod, save_fig, fig_name)
+    J, D, ADS = evaluate_paths_multi(paths, cell_centers, pod, save_res, filename)
     #J, D, ADS = evaluate_path(paths[0], cell_centers, save_fig, fig_name)
     #ax2 = ax.twinx()
     #plot the path
@@ -477,11 +198,11 @@ def main(save_fig = 0, fig_name = 'result'):
     #"""
     
     #plt.savefig('./other_figures/example_mission_env.pdf', format = "pdf", bbox_inches='tight')
-    if save_fig == 1:
+    if save_res == 1:
         #print(os.getcwd())
         #plt.savefig('./tese/code_multi_uavs/result_images/' + fig_name + '.pdf', format = 'pdf', bbox_inches='tight')
-        plt.savefig('./tese/code_var_poc/result_images/' + fig_name + '.pdf', format = 'pdf', bbox_inches='tight')
-        f = open('./tese/code_var_poc/result_images/' + fig_name+'.txt', "a")
+        plt.savefig('./tese/code_var_poc/result_images/' + filename + '.pdf', format = 'pdf', bbox_inches='tight')
+        f = open('./tese/code_var_poc/result_images/' + filename+'.txt', "a")
         f.write("Bayesian opt iter for grid = 1000\n")
         f.write("time to get grid (s) = " + str(end_grid-start_grid)+"\n")
         f.write("Wall clock time (s)" + str(end-start) + "\n")
@@ -536,12 +257,56 @@ def main(save_fig = 0, fig_name = 'result'):
     
 
 if __name__=='__main__':
-    #try:
+    if len(sys.argv) < 3 or len(sys.argv) > 5:
+        print("The required structure of command line arguments is the following:")
+        print("     python main.py <host> <algorithm> [save result] [file name]")
+        print("The following options are available:")
+        print("     host (required argument): local or remote")
+        print("     algorithm (required argument): UninfAtt, Att, SA, ACO or MCTS")
+        print("     save result (optional argument, default 0): 0 or 1")
+        print("     file name (optional argument, default is date-time): whatever_name_you_want")
+        print("Example command:")
+        print("     python main.py local Att 1 john_file_doe")
+        exit()
+    
+    if sys.argv[1] not in ['local', 'remote']:
+        print("The required structure of command line arguments is the following:")
+        print("     python main.py <host> <algorithm> [save result] [file name]")
+        print("The host argument must be: local or remote")
+        exit()
+    
+    if sys.argv[2] not in ['UninfAtt', 'Att', 'SA', 'ACO', 'MCTS']:
+        print("The required structure of command line arguments is the following:")
+        print("     python main.py <host> <algorithm> [save result] [file name]")
+        print("An invalid algorithm was chosed. The available options are: UninfAtt, Att, SA, ACO or MCTS.")
+        exit()
+    
+    if len(sys.argv) > 3 and sys.argv[3] not in ['0', '1']:
+        print("The required structure of command line arguments is the following:")
+        print("     python main.py <host> <algorithm> [save result] [file name]")
+        print("The host argument must be: 0 or 1")
+        exit()
+    
+    #Check if the results should be saved
+    if len(sys.argv) > 3:
+        save_res = int(sys.argv[3])
+    else:
+        save_res = 0
+        
+
+    if sys.argv[1] == 'local':
+        if len(sys.argv) == 5:
+            filename = sys.argv[4]
+        else:
+            now = datetime.now()
+            filename = now.strftime("%d_%m_%Y_%Hh_%Mm_%Ss")
+        main(sys.argv[2], save_res, filename)
+    
     if sys.argv[1] == 'remote':
         #Used for graph search
         import paramiko
         #from remote_plot import plt
-        print("running in server")
+        print("Running algorithm in server")
         # Connect to remote host
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -550,25 +315,27 @@ if __name__=='__main__':
         # Setup sftp connection and transmit this script
         sftp = client.open_sftp()
         #sftp.put(__file__, '/tmp/code/main.py')
-        sftp.put(__file__, './tese/code_var_poc/main.py')
-        sftp.put('./algorithms.py', './tese/code_var_poc/algorithms.py')
-        sftp.put('./utils.py', './tese/code_var_poc/utils.py')
-        sftp.put('./search.py', './tese/code_var_poc/search.py')
-        sftp.put('./utils2.py', './tese/code_var_poc/utils2.py')
+        sftp.put(__file__, './main.py')
+        sftp.put('./algorithms.py', './algorithms.py')
+        sftp.put('./utils.py', './utils.py')
+        sftp.put('./search.py', './search.py')
+        sftp.put('./utils2.py', './utils2.py')
         #sftp.put('./algorithms_v2.py', './tese/code_multi_uavs/algorithms_v2.py')
         sftp.close()
         
         # Run the transmitted script remotely without args and show its output.
         # SSHClient.exec_command() returns the tuple (stdin,stdout,stderr)
-        now = datetime.now()
-        img_name = now.strftime("%d_%m_%Y_%Hh_%Mm_%Ss")
         
-
-        #stdin, stdout, stderr = client.exec_command('python /tmp/main.py local_in_server ' + img_name)# + '| tee ./tese/code/result_images/' + img_name + '.txt')
-        stdin, stdout, stderr = client.exec_command('python3 ./tese/code_var_poc/main.py local_in_server ' + img_name)
+        if len(sys.argv) == 5:
+            filename = sys.argv[4]
+        else:
+            now = datetime.now()
+            filename = now.strftime("%d_%m_%Y_%Hh_%Mm_%Ss")
+        
+        stdin, stdout, stderr = client.exec_command('python3 ./main.py local ' + sys.argv[2] +' '+ str(save_res) +' '+ filename)
         
         stdin.close()
-        for line in stdout:#iter(stdout.readline, ""):
+        for line in stdout:
             # Process each line in the remote output
             print(line, end="")
         
@@ -583,14 +350,5 @@ if __name__=='__main__':
         client.close()
         sys.exit(0)
     
-    elif sys.argv[1] == 'local_in_server':
-        #from remote_plot import plt
-        main(1, sys.argv[2])
     
-    elif sys.argv[1] == 'local':
-        #from remote_plot import plt
-        main(0)
-
-    #except IndexError:
-        #print("running locally")
-        #main()
+    

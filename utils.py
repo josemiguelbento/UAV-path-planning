@@ -80,24 +80,6 @@ class Mission():
             POC_sigma_x_list = [random.randint(int(300*size_scale), int(800*size_scale)) for _ in range(num_expected_pos)]
             POC_sigma_y_list = [random.randint(int(300*size_scale), int(800*size_scale)) for _ in range(num_expected_pos)]
             self.POC_variance_matrices = [[[POC_sigma_x**2, correlation*POC_sigma_x*POC_sigma_y],[correlation*POC_sigma_x*POC_sigma_y, POC_sigma_y**2]] for (correlation, POC_sigma_x, POC_sigma_y) in zip(correlation_list, POC_sigma_x_list, POC_sigma_y_list)]
-        
-        """
-        else: #randomize the mission
-            random.seed(seed)
-            #Randomly generate an AOI
-            size_scale = 1
-            
-            self.AOI_vertices = generate_random_polygon(center=(2800/size_scale, 2500/size_scale), avg_radius=2200/size_scale, irregularity=0.35, spikiness=0.2, num_vertices=12)
-            self.AOI_polygon = geom.polygon.Polygon(self.AOI_vertices)
-            self.NFZ_vertices = randomize_NFZs(self.AOI_polygon)
-            self.NFZ_polygons = [geom.polygon.Polygon(vert) for vert in self.NFZ_vertices]
-            
-            num_expected_pos = random.randint(3,10)
-            self.POC_x0_list = [random.randint(0, int(5000/size_scale)) for _ in range(num_expected_pos)]
-            self.POC_y0_list = [random.randint(0, int(5000/size_scale)) for _ in range(num_expected_pos)]
-            self.POC_sigma_x_list = [random.randint(int(100/size_scale), int(1000/size_scale)) for _ in range(num_expected_pos)]
-            self.POC_sigma_y_list = [random.randint(int(100/size_scale), int(1000/size_scale)) for _ in range(num_expected_pos)]
-        """
             
         #sensor data from a DJI phantom 4 pro
         self.hfov = 84 #field of view in degrees
@@ -141,7 +123,7 @@ class Mission():
         
         return copy.deepcopy(self.cell_centers)
     
-    def generate_optimal_grid(self):
+    def generate_optimal_grid(self, theta = 0, sx = 0, sy = 0):
         #grid size calculation
         self.d = 2*(1-self.p_o/100)*self.h_sensor*math.tan(self.hfov/2) #as per eq 3.1 in PAer report
         
@@ -149,10 +131,6 @@ class Mission():
         CG_grid, m = define_initial_grid(self.AOI_vertices, self.d)
         
         #Calculate the centers of the grid cells
-        #self.cell_centers = calculate_grid_cells_centers(CG_grid, m, self.d)
-        sx = 0#-15.405420976311#0
-        sy = 0#33.3697926407582#0
-        theta = 0#-0.1137667247745#0#math.pi/4
         self.cell_centers = calculate_grid_cells_centers_shifted_and_rotated(CG_grid, m, self.d, sx, sy, theta)
         
         #self.AOI_polygon = geom.polygon.Polygon(self.AOI_vertices)
