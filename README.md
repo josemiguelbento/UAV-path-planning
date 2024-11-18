@@ -35,13 +35,10 @@ python main.py <host> <algorithm> [save result] [file name]
 ```
 
 The following options are available:
-
-\begin{itemize}
-    \item host (required argument): local or remote
-    \item algorithm (required argument): UninfAtt, Att, SA, ACO or MCTS
-    \item save result (optional argument, default 0): 0 or 1
-    \item file name (optional argument, default is date-time): whatever_name_you_want
-\end{itemize}
+* host (required argument): local or remote
+* algorithm (required argument): UninfAtt, Att, SA, ACO or MCTS
+* save result (optional argument, default 0): 0 or 1
+* file name (optional argument, default is date-time): whatever_name_you_want
 
 Example command:
 ```
