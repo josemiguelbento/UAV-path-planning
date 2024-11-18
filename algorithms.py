@@ -8,6 +8,7 @@ import numpy as np
 import multiprocessing
 
 class Attraction_algorithm():
+    """Class that describes the functions necessary for the implementation of the Attraction algorithm."""
     def __init__ (self, cell_list, d, initial_energies, number_uavs, pod):
         self.valid_cell_list = [cell for cell in copy.deepcopy(cell_list) if cell.status == 1]
         self.number_uavs = number_uavs
@@ -37,7 +38,6 @@ class Attraction_algorithm():
                 if att> max_att:
                     max_att = att
                     max_cell = cell2
-                    max_idx = idx
         
         if max_att == 0:
             #If all of the valid cells have been fully searched (only happens if POD = 100%), the max attraction is 0
@@ -64,8 +64,10 @@ class Attraction_algorithm():
         stopped_uavs = [] #List with the stopped - 1/moving - 0 status of the UAVs
         
         #Randomly chooses a starting position for the paths of the available UAVs and initializes their paths
+        dep_choices_idx = list(range(len(self.valid_cell_list)))
         for uav in range(self.number_uavs):
-            idx = random.randrange(len(self.valid_cell_list))
+            #Bias the starting positions towards cells with a high POC value
+            idx = random.choices(dep_choices_idx, weights = [self.valid_cell_list[i].poc for i in dep_choices_idx])[0]
             initial_cell = self.valid_cell_list[idx]
             cell = copy.deepcopy(initial_cell)
             cell.prev_action = ('FIRST', 0, 0)
@@ -120,16 +122,12 @@ class Attraction_algorithm():
         cos_angle = round(cos_angle,4)
         angle = np.arccos(cos_angle)/np.pi*180
         return angle
-    
-        
 
-class SimulatedAnnealing_v2():
-    """Using Cooling in Polynomial time from chapter 1 if the Handbook of Metaheuristics"""
-    def __init__ (self, cell_list, d, type_init, number_threads, synchronism, initial_energies, number_uavs, initial_positions, pod, fixed_initial_positions = False):
+class SimulatedAnnealing():
+    """Class that describes the functions necessary for the implementation of the Simulated Annealing algorithm."""
+    def __init__ (self, cell_list, d, type_init, number_threads, synchronism, initial_energies, number_uavs, pod):
         self.number_threads = number_threads
         self.number_uavs = number_uavs
-        self.initial_positions = initial_positions
-        self.fixed_initial_positions = fixed_initial_positions
         if number_threads <= 0:
             print("The number of threads must be a positive integer")
             exit()
@@ -153,90 +151,51 @@ class SimulatedAnnealing_v2():
         self.turn_weight = 0.0173
         self.distance_weight = 0.1164
         self.min_energy = self.distance_weight * self.d
-        self.L_k = 1000
         self.neighbour_cases = [1,2,3,4,5]
         self.pod = pod
-        #Minimum length of the Markov chain
-        #self.L_k_min = 500
-        #Expected neighbourhood size due to removing, changing and adding nodes, respectively
-        #max_steps = self.initial_energy/self.min_energy
-        #self.L_k = math.ceil(1*(max_steps) + 3*(max_steps+1) + 4*(max_steps))
-        #if self.L_k < self.L_k_min:
-        #    self.L_k = self.L_k_min
-        
-        if type_init == 0:
-            #Use attraction path as initial guess
-            self.initial_temp = 0.0004
-            self.cooling_factor = 0.99
-            self.final_temp = 2.755e-6
-        elif type_init == 1:
-            #Use random walk as initial guess
-            self.initial_temp = 0.0085
-            self.cooling_factor = 0.99
-            self.final_temp = 2.755e-6
+
+        self.L_k = 100#2653
+        self.initial_temp = 1.83e-4
+        self.cooling_factor = 0.9#0.954
+        self.final_temp = 2.11e-5
         
         self.create_adjacency_dict()
-        self.calculate_initial_guess(cell_list, initial_energies, number_uavs, initial_positions)
+        self.calculate_initial_guess(cell_list, initial_energies, number_uavs)
         
-        #We can calculate the initial temperature based on the acceptance rate
-        #self.initial_temp = 0
-        #self.accept_rate = 0.8
-        self.delta = 0.5
-        #self.stop_criteria = 0.05
-        #The cooling factor is usually between 0.8 and 0.99
         self.my_lock = multiprocessing.Lock()
         self.threads_finished_loop_cond = multiprocessing.Condition(lock=self.my_lock)
     
     def create_adjacency_dict(self):
-        """Fills in a dictionary with keys as cells indexes and values as a list of indexes of adjacent cells"""
-        #Using 8 connected definition
+        """Fills in a dictionary with keys as cells indexes and values as a list of indexes of adjacent cells."""
+        #Using 8 connected adjecency definition
         for idx1 in range(len(self.valid_cell_list)):
             for idx2 in range(idx1+1, len(self.valid_cell_list)):
                 if check_if_cells_adjacent_8_conn(self.valid_cell_list[idx1], self.valid_cell_list[idx2]):
                     self.adj_dict[idx1].append(idx2)
                     self.adj_dict[idx2].append(idx1)
-        #Create the dictionary entre for the first virtual node
+        #Create the dictionary entry for the pre-deployment state
         self.adj_dict[-1] = [idx for idx in range(len(self.valid_cell_list))]
     
-    def calculate_initial_guess(self, cell_list, initial_energies, number_uavs, initial_positions):
-        if self.fixed_initial_positions:
+    def calculate_initial_guess(self, cell_list, initial_energies, number_uavs):
+        """Generates the initial solution guess to start the algorithm. A different initial solution is generated for each thread."""
+        for i in range(self.number_threads):
             if self.type_init == 0:
                 #Use attraction path as initial guess
-                att = Attraction_algorithm(cell_list,self.d,[], initial_energies, number_uavs, initial_positions, self.pod)            
+                att = Attraction_algorithm(cell_list,self.d, initial_energies, number_uavs, self.pod)            
                 att.generate_uav_path()
-                for i in range(self.number_threads):
-                    self.initial_guess_list.append(att.paths)
+                self.initial_guess_list.append(att.paths)
             elif self.type_init == 1:
-                for i in range(self.number_threads):
-                    #Use random walk as initial guess
-                    aux_paths = []
-                    for j in range(number_uavs):
-                        #random.seed(i)
-                        aux_paths.append(self.random_walk_initial_guess(initial_energies[j], initial_positions[j]))
-                    self.initial_guess_list.append(aux_paths)
-                #random.seed(time.time())
-        else: #Use random initial positions
-            #The best results might be obtained by deploying close to the suspected target positions or the areas with the most density of probability
-            for i in range(self.number_threads):
-                #random.seed(i)
-                #choose the deployment points based on the POC of the cells
+                #Bias the deployment positions towards cells with a high POC
                 available_pos = [[cell.i,cell.j] for cell in self.valid_cell_list]
                 initial_pos = random.choices(available_pos, weights = [cell.poc for cell in self.valid_cell_list], k = number_uavs)
-                #initial_pos = random.choices(available_pos, k = number_uavs)
-                if self.type_init == 0:
-                    #Use attraction path as initial guess
-                    att = Attraction_algorithm(cell_list,self.d,[], initial_energies, number_uavs, initial_pos, self.pod)            
-                    att.generate_uav_path()
-                    self.initial_guess_list.append(att.paths)
-                elif self.type_init == 1:
-                    #Use random walk as initial guess
-                    aux_paths = []
-                    for j in range(number_uavs):
-                        aux_paths.append(self.random_walk_initial_guess(initial_energies[j], initial_pos[j]))
-                    self.initial_guess_list.append(aux_paths)
-            #random.seed(time.time())
+                #Use random walk as initial guess
+                aux_paths = []
+                for j in range(number_uavs):
+                    aux_paths.append(self.random_walk_initial_guess(initial_energies[j], initial_pos[j]))
+                self.initial_guess_list.append(aux_paths)
     
     def random_walk_initial_guess(self, initial_energy, initial_cell_pos):
+        """Generates a path for all of the UAVs using Random Walk (RW)."""
         step_distance = 0
         step_turns = 0
         energy_consumed = 0
@@ -251,42 +210,18 @@ class SimulatedAnnealing_v2():
             energy_consumed = energy_consumed + self.turn_weight*step_turns + self.distance_weight*step_distance
         return path
     
-    
     def calculate_energy(self, paths):
+        """Calculates the energy of a solution. In this case E = -J."""
         return -calculate_objective_multi(self.valid_cell_list, paths, self.pod, self.factor)
-    
-    def calculate_initial_temperature(self, initial_path):
-        m_0 = 1000
-        m_1 = 0
-        m_2 = 0
-        delta_f_list = []
-        energy= self.calculate_energy(initial_path)
-        for i in range(m_0):
-            candidate = self.get_random_neighbour(initial_path)
-            #Calculate the energy of this new path
-            energy_new = self.calculate_energy(candidate)
-            #If the new path is better, accept it, and if it is worse dont
-            if energy_new < energy:
-                m_1 += 1
-            else:
-                delta_f_list.append(energy_new-energy)
-                m_2 += 1
-        delta_f_avg = sum(delta_f_list)/len(delta_f_list)
-        #print(m_2/(m_2*self.accept_rate - m_1*(1-self.accept_rate)))
-        initial_temp = delta_f_avg/(math.log(m_2/(m_2*self.accept_rate - m_1*(1-self.accept_rate))))
-        print("Initial temperature: ", initial_temp)
-        return initial_temp
         
     def prob_accept(self, delta_E, T):
-        #Note: delta_E < 0
+        """Calculates the probability of accepting a candidate solution."""
         return math.exp(delta_E/(T))
     
     def remove_node_mid(self, candidate):
+        """Removes a random step from the middle of the path of a random UAV."""
         #Find a random node in the path
-        if not self.fixed_initial_positions:
-            aux = list(range(0,len(candidate)))
-        else:
-            aux = list(range(1,len(candidate)))
+        aux = list(range(0,len(candidate)))
         random.shuffle(aux)
         while aux:
             idx = aux.pop()
@@ -295,22 +230,19 @@ class SimulatedAnnealing_v2():
                 removed_cell_idx = candidate.pop(idx)
                 return candidate
             #Check if the prev and next nodes are adjacent
-            elif candidate[idx-1] in self.adj_dict[candidate[idx+1]]: #check_if_cells_adjacent_8_conn(self.valid_cell_list[candidate[idx-1]], self.valid_cell_list[candidate[idx+1]]):
+            elif candidate[idx-1] in self.adj_dict[candidate[idx+1]]:
                 removed_cell_idx = candidate.pop(idx)
                 return candidate
         return candidate
     
     def change_node_position(self, candidate):
+        """Changes the position of a random step in the path of a random UAV."""
         #Try different indexes until one is changed
-        if not self.fixed_initial_positions:
-            aux = list(range(0,len(candidate)))
-        else:
-            aux = list(range(1,len(candidate)))
+        aux = list(range(0,len(candidate)))
         random.shuffle(aux)
         while aux:
             idx = aux.pop()
-            #In case the node selected to change is the last
-            if idx == len(candidate)-1:
+            if idx == len(candidate)-1: #In case the node selected to change is the last
                 neighbours = copy.deepcopy(self.adj_dict[candidate[idx-1]])
                 neighbours.remove(candidate[idx])
                 if len(neighbours) != 0:
@@ -318,26 +250,18 @@ class SimulatedAnnealing_v2():
                     next_cell_idx = random.choice(neighbours)
                     candidate[idx] = next_cell_idx
                     return candidate
-            #In case the node selected to change is in the start
-            elif idx == 0:
+            elif idx == 0: #In case the node selected to change is in the start
                 neighbours = copy.deepcopy(self.adj_dict[candidate[idx+1]])
                 neighbours.remove(candidate[idx])
                 if len(neighbours) != 0:
                     next_cell_idx = random.choice(neighbours)
                     candidate[idx] = next_cell_idx
                     return candidate
-            #In case the node selected to change is in the middle
-            else:
+            else: #In case the node selected to change is in the middle
                 #Get common neighbours between prev and next nodes
                 neighbours_prev = self.adj_dict[candidate[idx-1]]
                 neighbours_next = self.adj_dict[candidate[idx+1]]
                 neighbours = [i for i in neighbours_prev if i in neighbours_next]
-                #if candidate[idx] not in neighbours:
-                #    print(candidate[idx-1], candidate[idx], candidate[idx+1])
-                #    coords = [(self.valid_cell_list[step].i, self.valid_cell_list[step].j)  for step in [candidate[idx-1], candidate[idx], candidate[idx+1]]]
-                #    print(coords)
-                #    print(neighbours)
-                #else:
                 neighbours.remove(candidate[idx])
                 if len(neighbours) != 0:
                     next_cell_idx = random.choice(neighbours)
@@ -346,6 +270,7 @@ class SimulatedAnnealing_v2():
         return candidate
 
     def add_node_mid(self, candidate):
+        """Adds a step in a random position in the path of a random UAV."""
         #Find a random node in the path
         aux = list(range(0,len(candidate)-1)) #The selected node cant be the last since this one will probably be deleted
         random.shuffle(aux)
@@ -363,9 +288,7 @@ class SimulatedAnnealing_v2():
         return candidate
     
     def change_initial_position(self, candidate, uav):
-        if self.fixed_initial_positions:
-            return candidate
-        
+        """Changes the initial position of the path of a random UAV to one of the subsequent steps in its path."""
         #Change the initial position to any of the cells in the path
         new_start = random.choice(range(1,len(candidate[uav])))
         neighbour = copy.deepcopy(candidate[uav][new_start:])
@@ -374,8 +297,7 @@ class SimulatedAnnealing_v2():
         return candidate
     
     def add_node_end(self, candidate, energy_available):
-        #print(self.min_energy)
-        #print("energy_available: ", energy_available)
+        """Checks if the UAV has enough energy available at the end of the path to perform another step. It so, another step is added at the end."""
         if energy_available <self.min_energy:
             return candidate
         adj_sorted = copy.deepcopy(self.adj_dict[candidate[-1]])
@@ -395,6 +317,7 @@ class SimulatedAnnealing_v2():
         return candidate
     
     def check_if_valid_path(self, candidate):
+        """Checks if the adjacency constraint is violated for a given path. Not used in the code, but useful for debugging."""
         for step in range(len(candidate)-1):
             if candidate[step+1] not in self.adj_dict[candidate[step]]:
                 print("Problem at step ", step)
@@ -402,15 +325,8 @@ class SimulatedAnnealing_v2():
                 return False
         return True
         
-        
-        for path in candidate:
-            for step in range(len(path)-1):
-                if path[step+1] not in self.adj_dict[path[step]]:
-                    print("Problem at step ", step)
-                    print(candidate)
-                    return False
-        return True
     def remove_path_crossing(self, candidate, case):
+        """Removes an instance when the path of a random UAV crosses itself, or removes an instance when the paths of two random UAVs cross each other. A battery check and adjustment is performed at the end."""
         uav1 = random.randint(0,self.number_uavs-1)
         if case == 0:
             uav2 = random.randint(0,self.number_uavs-1)
@@ -421,7 +337,7 @@ class SimulatedAnnealing_v2():
             aux_list.remove(uav1)
             uav2 = random.choice(aux_list)
         step_list = list(range(len(candidate[uav1])-1))
-        #random.shuffle(step_list)
+
         for step in step_list:
             i1 = self.valid_cell_list[candidate[uav1][step]].i
             j1 = self.valid_cell_list[candidate[uav1][step]].j
@@ -434,7 +350,6 @@ class SimulatedAnnealing_v2():
                     i4 = self.valid_cell_list[candidate[uav2][aux+1]].i
                     j4 = self.valid_cell_list[candidate[uav2][aux+1]].j
                     if i1+i2 == i3+i4 and j1+j2 == j3+j4 and not (i1==i3 and j1==j3) and not (i1==i4 and j1==j4):
-                        #print("Cross detected")
                         #The paths cross
                         if uav1 == uav2:
                             #Modifications within a single path
@@ -449,61 +364,16 @@ class SimulatedAnnealing_v2():
                         else:
                             #Modifications in different paths
                             aux_list1 = copy.deepcopy(candidate[uav1][:step+1] + candidate[uav2][aux+1:])
-                            #if not self.check_if_valid_path(aux_list1):
-                            #    print(candidate[uav1][:step+2])
-                            #    print(candidate[uav2][aux:])
-                            #    exit()
                             aux_list2 = copy.deepcopy(candidate[uav2][:aux+1] + candidate[uav1][step+1:])
-                            #if not self.check_if_valid_path(aux_list2):
-                            #    print(candidate[uav2][:aux+2])
-                            #    print(candidate[uav1][step:])
-                            #    exit()
                             aux_list1 = self.adjust_path_batt(aux_list1, uav1)
                             aux_list2 = self.adjust_path_batt(aux_list2, uav2)
                             candidate[uav1]= aux_list1
                             candidate[uav2]= aux_list2
                         return candidate
         return candidate
-        
-    def split_in_common_cell(self, candidate):
-        uav1 = random.randint(0,self.number_uavs-1)
-        uav2 = random.randint(0,self.number_uavs-1)
-        step_list = list(range(len(candidate[uav1])-1))
-        #random.shuffle(step_list)
-        for step in step_list:
-            for aux in range(len(candidate[uav2])-1):
-                if candidate[uav1][step] == candidate[uav2][aux]: #the cell is visited twice
-                    if uav1 == uav2 and step != aux: #The cell is revisited by the same path
-                        #print("Cross detected")
-                        if step < aux:
-                            aux_list = candidate[uav1][step+1:aux]
-                            aux_list.reverse()
-                            candidate[uav1][step+1:aux] = aux_list
-                        else:
-                            aux_list = candidate[uav1][aux+1:step]
-                            aux_list.reverse()
-                            candidate[uav1][aux+1:step] = aux_list
-                        return candidate
-                    elif uav1 != uav2:
-                        #Modifications in different paths
-                        aux_list1 = copy.deepcopy(candidate[uav1][:step+1] + candidate[uav2][aux+1:])
-                        #if not self.check_if_valid_path(aux_list1):
-                        #    print(candidate[uav1][:step+2])
-                        #    print(candidate[uav2][aux:])
-                        #    exit()
-                        aux_list2 = copy.deepcopy(candidate[uav2][:aux+1] + candidate[uav1][step+1:])
-                        #if not self.check_if_valid_path(aux_list2):
-                        #    print(candidate[uav2][:aux+2])
-                        #    print(candidate[uav1][step:])
-                        #    exit()
-                        aux_list1 = self.adjust_path_batt(aux_list1, uav1)
-                        aux_list2 = self.adjust_path_batt(aux_list2, uav2)
-                        candidate[uav1]= aux_list1
-                        candidate[uav2]= aux_list2
-                        return candidate
-        return candidate
     
     def adjust_path_batt(self, candidate, uav):
+        """If the path's energy demands excede the energy available to the UAV, remove steps from the end. The the UAV still has enough energy available at the end of the path, add further steps in its path if possible."""
         path = [self.valid_cell_list[idx] for idx in candidate]
         step_distance = 0
         step_turns = 0
@@ -520,19 +390,8 @@ class SimulatedAnnealing_v2():
         candidate = self.add_node_end(candidate, self.initial_energies[uav]-energy_consumed)
         return candidate
     
-    def calculate_candidate_battery_use(self, candidate):
-        path = [self.valid_cell_list[idx] for idx in candidate]
-        step_distance = 0
-        step_turns = 0
-        energy_consumed = 0
-        for idx in range(len(path)-1):
-            step_distance = math.sqrt((path[idx+1].x - path[idx].x)**2 + (path[idx+1].y - path[idx].y)**2)
-            if idx != 0:
-                step_turns = calculate_turn(path[idx-1], path[idx], path[idx+1]) #in degrees
-            energy_consumed = energy_consumed + self.turn_weight*step_turns + self.distance_weight*step_distance
-        return energy_consumed
-    
     def get_indexes(self, paths):
+        """Converts a path represented as a list of cell objects into a list of the corresponding indexes in the valid_cell_list."""
         paths_idx = []
         for path in paths:
             path_idx = []
@@ -543,6 +402,7 @@ class SimulatedAnnealing_v2():
         return paths_idx
     
     def get_random_neighbour(self, accepted_path):
+        """Generates a random neighbour solution to the currently accepted solution."""
         candidate = copy.deepcopy(accepted_path)
         case = random.choice(self.neighbour_cases)
         uav = random.randint(0,self.number_uavs-1)
@@ -564,14 +424,9 @@ class SimulatedAnnealing_v2():
         elif case == 4:
             #If a cross with no common cell is detected, change the path terminations
             candidate = self.remove_path_crossing(candidate, 0) #battery adjustment done inside
-        #elif case == 6:
-        #    candidate = self.remove_path_crossing(candidate, 2)
         elif case == 5:
             #Change the starting position of a path
             candidate = self.change_initial_position(candidate, uav)
-            
-            #If the paths visit the same cell, change the path terminations
-            #candidate = self.split_in_common_cell(candidate)
             
         #In the case 1 it happens a lot that the node to be removed is the last and the candidate is the same as the path
         if (case == 1 or case == 4 or case == 5) and candidate == accepted_path:
@@ -587,73 +442,41 @@ class SimulatedAnnealing_v2():
         
         return candidate
     
-    def calculate_f_inf(self):
-        f_inf = 0
-        energy_list = []
-        for i in range(1000):
-            random.seed(i)
-            path = self.random_walk_initial_guess()
-            energy_list.append(self.calculate_energy(self.get_indexes(path)))
-        random.seed(time.time())
-        f_inf = sum(energy_list)/len(energy_list)
-        return f_inf
-    
     def thread_is_behind(self, curr_thread_idx):
+        """Checks if a thread is behind or ahead of the other threads, in terms of the number of times that the temperature has been reduced."""
         if all([self.thread_iteration[curr_thread_idx] <= thread_iter for thread_iter in self.thread_iteration[0:self.number_threads]]):
             return True
         else:
             return False
-        """
-        #print("L_k = "+str(self.L_k)+str(self.thread_iteration[0:self.number_threads]))
-        first = self.thread_iteration[0]
-        for n_loops in self.thread_iteration[0:self.number_threads]:
-            if first != n_loops:
-                #print("Thread waiting")
-                return False
-        #print("Thread running")
-        return True
-        """
-    def all_threads_synched(self, curr_thread_idx):
-        if all([self.thread_last_update_iteration[curr_thread_idx] == last_update_iter for last_update_iter in self.thread_last_update_iteration[0:self.number_threads]]):
-            return True
-        else:
-            return False
         
-        if all([self.threads_paths_energy[curr_thread_idx] == self.threads_paths_energy[thread_idx] for thread_idx in range(self.number_threads) if self.thread_iteration[curr_thread_idx] > self.thread_iteration[thread_idx]]):
+    def all_threads_synched(self, curr_thread_idx):
+        """Check if all of the threads have reduced their temperature the same number of times, before updating its own accepted solution in the shared memory."""
+        if all([self.thread_last_update_iteration[curr_thread_idx] == last_update_iter for last_update_iter in self.thread_last_update_iteration[0:self.number_threads]]):
             return True
         else:
             return False
     
     def all_threads_at_same_iter(self, curr_thread_idx):
+        """Checks if all of the threads have updated their accepted solutions before starting to compare them."""
         if all([self.thread_iteration[curr_thread_idx] == thread_iter for thread_iter in self.thread_iteration[0:self.number_threads]]):
             return True
         else:
             return False
     
     def run_SA_in_thread(self, thread_idx, threads_path, threads_finished_loop_cond):
+        """Run the single-threaded SA algorithm inside each thread."""
         thread_start_time = time.time()
         thread_start_process_time = time.process_time()
         #Get idx in path
         accepted_path = self.get_indexes(self.initial_guess_list[thread_idx])
         energy = self.calculate_energy(accepted_path)
-        #print("Initial energy: ", energy)
-        #self.initial_temp = self.calculate_initial_temperature(accepted_path)
         c_k = self.initial_temp
-        c_k_prev = 0
-        f_k = 0
-        f_k_prev = 0
-        #f_inf = self.calculate_f_inf()
-        #print("f_inf = ", f_inf)
-        #print("Initial path energy: ", energy)
         
         iterations = 0
         energy_list = []
         energy_list.append(energy)
-        #term_cond = 100
-        #e_s = self.stop_criteria
+
         while c_k > self.final_temp: #Termination condition
-        #while iterations == 0 or abs((f_k-f_k_prev)/(c_k-c_k_prev)/f_inf*c_k) >= e_s:
-            
             candidate_path_energy = []
             for i in range(self.L_k):
                 #randomly choose a modification to perform on the path
@@ -664,23 +487,9 @@ class SimulatedAnnealing_v2():
                 if energy_new < energy or random.random() < self.prob_accept(energy - energy_new, c_k):
                     energy = energy_new
                     accepted_path = copy.deepcopy(candidate)
-            #std_dev = np.std(candidate_path_energy)
-            #f_k_prev = f_k
-            #f_k = sum(candidate_path_energy)/len(candidate_path_energy)
-            #if c_k == self.initial_temp:
-            #    f_inf = f_k
-            #    print("f_inf = ", f_inf)
-            
-            #c_k_prev = c_k
+
             c_k = c_k * self.cooling_factor
             
-            #std_dev = np.std(candidate_path_energy)
-            #alpha = math.log(1+self.delta)/(3*std_dev)
-            #c_k = c_k/(1+alpha*c_k)
-            #print(c_k)
-            #print(c_k/c_k_prev)
-            #print("Temperature = ", c_k_prev, "Term_cond = ", abs((f_k-f_k_prev)/(c_k-c_k_prev)/f_inf*c_k), "alpha: ", c_k/c_k_prev)
-            #print("Temperature = ", c_k_prev)
             energy_list.append(energy)
             iterations += 1
             if self.synchronism == 1:
@@ -691,7 +500,6 @@ class SimulatedAnnealing_v2():
                         self.threads_finished_loop_cond.wait()
                     #Changes the iterations array
                     self.thread_iteration[thread_idx] = iterations
-                    #print("Thread "+str(thread_idx)+" updated iteration. Current status: " + str(self.thread_iteration[0:self.number_threads]))
                     self.threads_finished_loop_cond.notify_all()
                     while not self.all_threads_synched(thread_idx):
                         self.threads_finished_loop_cond.wait()
@@ -701,7 +509,6 @@ class SimulatedAnnealing_v2():
                     self.threads_paths_energy[thread_idx] = energy
                     #Notify any remaining waiting threads
                     self.threads_finished_loop_cond.notify_all()
-                    #print("Thread "+str(thread_idx)+" updated path energy. Current status: " + str(self.thread_iteration[0:self.number_threads]))
                     #Wait for all threads to complete the iteration before comparing results
                     while not self.all_threads_at_same_iter(thread_idx):
                         self.threads_finished_loop_cond.wait()
@@ -714,27 +521,19 @@ class SimulatedAnnealing_v2():
                     
                     self.threads_paths_energy[thread_idx] = min_energy
                     self.threads_finished_loop_cond.notify_all()
-                    #print("Thread "+str(thread_idx)+" updated best path. Current status: " + str(self.thread_iteration[0:self.number_threads]))
                     
         if self.synchronism == 0:
             threads_path[:] = accepted_path
             self.threads_paths_energy[thread_idx] = energy
-        #plt.figure()
-        #plt.title("Energy evolution through iterations")
-        #plt.plot(energy_list)
-        #plt.show()
+
         thread_end_process_time = time.process_time()
         thread_end_time = time.time()
         self.threads_process_time[thread_idx] = thread_end_process_time-thread_start_process_time
         self.threads_time[thread_idx] = thread_end_time-thread_start_time
         
     
-    def generate_uav_path(self, save_fig, fig_name):
-        #self.threads_paths_energy = multiprocessing.Array('f', [0 for i in range(self.number_threads)])
-        #self.threads_process_time = multiprocessing.Array('f', [0 for i in range(self.number_threads)])
-        #self.threads_time = multiprocessing.Array('f', [0 for i in range(self.number_threads)])
-        #self.thread_iteration = multiprocessing.Array('i', [0 for i in range(self.number_threads)])
-        #self.thread_last_update_iteration = multiprocessing.Array('i', [0 for i in range(self.number_threads)])
+    def generate_uav_path(self, save_res, filename):
+        """Generate the paths of the UAVs using the SA algorithm."""
         
         my_lock = multiprocessing.Lock()
         threads_finished_loop_cond = multiprocessing.Condition(lock=my_lock)
@@ -743,30 +542,22 @@ class SimulatedAnnealing_v2():
         #Run the SA algorithm in the specified number of threads
         for thread_idx in range(self.number_threads):
             aux_thread = multiprocessing.Process(target=self.run_SA_in_thread, args=(thread_idx, self.threads_paths[thread_idx],threads_finished_loop_cond,))
-            #aux_thread.daemon = True
             aux_thread.start()
             thread_list.append(aux_thread)
         
         #Wait for the threads to finish
         for aux_thread in thread_list:
             aux_thread.join()
-            #pid, exit_status, resource_usage = os.wait4(aux_thread.pid, 0)
-            #user_time += resource_usage.ru_utime
-            #system_time += resource_usage.ru_stime
 
-        #print("Paths energies: ", list(self.threads_paths_energy))
-        #Ge the result from the thread that produced the best path
+        #Get the result from the thread that produced the best path
         best_path_energy = min(self.threads_paths_energy)
         for i in range(self.number_threads):
             if self.threads_paths_energy[i] == best_path_energy:
-                #print("Best path: ", i)
-                #print("Energy of best path: ", best_path_energy)
-                #print(self.threads_paths[i])
                 break
         #best_thread_indx = self.threads_paths_energy.index(best_path_energy)
         accepted_path = self.threads_paths[i]
-        if save_fig==1:
-            f = open('./tese/code_var_poc/result_images/' + fig_name+'.txt', "a")
+        if save_res==1:
+            f = open('./results/' + filename+'.txt', "a")
             f.write("Using simulated annealing v2\n")
             if self.type_init == 0:
                 f.write("Initialized with Attraction algorithm\n")
@@ -778,28 +569,22 @@ class SimulatedAnnealing_v2():
             f.write("cooling factor: " + str(self.cooling_factor) + '\n')
             f.write("Number of UAVs: " + str(self.number_uavs) + '\n')
             f.write("Energies available: " + str(self.initial_energies) + '\n')
-            f.write("Initial positions: " + str(self.initial_positions) + '\n')
             f.write("Number of threads: " + str(self.number_threads) + " Synchronism: "+ str(self.synchronism) + '\n')
-            f.write("Threads path energy results: " + str(list(self.threads_paths_energy[0:self.number_threads])) + '\n')
-            f.write("Accepted path energy: " + str(best_path_energy) + '\n')
+            f.write("Threads path J results: " + str(list(self.threads_paths_energy[0:self.number_threads])) + '\n')
+            f.write("Accepted path J: " + str(best_path_energy) + '\n')
             f.write("Path accepted: " + str(accepted_path) + '\n')
             f.write("Max thread processing time: " + str(max(self.threads_process_time)) + '\n')
             f.write("Sum of threads processing time: " + str(sum(self.threads_process_time)) + '\n')
             f.write("Max thread wall-clock time: " + str(max(self.threads_time)) + '\n')
             f.write("Sum of threads wall-clock time: " + str(sum(self.threads_time)) + '\n')
             f.close()
-        #print("Accepted path energy: ", energy)
-        #min_energy = min(candidate_path_energy)
-        #print("Minimum candidate path energy: ", min_energy)
+
         self.paths_idx = copy.deepcopy(accepted_path)
         self.paths = [[self.valid_cell_list[idx] for idx in aux_path] for aux_path in accepted_path]
-        #self.path = [self.valid_cell_list[idx] for idx in candidate_path_list[candidate_path_energy.index(min_energy)]]
 
-     
-class AntColonyOpt_v2():
+class AntColonyOpt():
+    """Class that describes the functions necessary for the implementation of the Ant Colony Optimization algorithm."""
     def __init__(self, cell_list, d, initial_energies, number_uavs, pod):
-        
-        #self.number_workers = number_workers
         self.number_uavs = number_uavs
         self.valid_cell_list = [cell for cell in cell_list if cell.status == 1]
         self.max_poc = max(cell.poc for cell in self.valid_cell_list)
@@ -808,9 +593,6 @@ class AntColonyOpt_v2():
         self.n_valid_cells = len(self.valid_cell_list)
         self.d = d
         self.initial_energies = initial_energies
-        #if number_workers <= 0:
-        #    print("The number of workers must be a positive integer")
-        #   exit()
 
         self.adj_dict = {idx:[] for idx in range(len(self.valid_cell_list))}
         self.create_adjacency_dict()
@@ -822,20 +604,16 @@ class AntColonyOpt_v2():
         self.distance_weight = 0.1164
         self.d = d
         self.max_energy = self.distance_weight * self.d * math.sqrt(2) + 180*self.turn_weight
-
-        self.max_iterations = 100
-        self.alpha = 0.9
-        self.beta = 1.5
-        self.evaporation = 0.01
-        self.Q = 0.015
+        
+        self.max_iterations = 10000
+        self.alpha = 2.73
+        self.beta = 19.96
+        self.evaporation =  0.690
+        self.Q = 9.56
+        self.min_heuristic = 9.31e-7
         
         self.number_of_nodes = 0
-        
-        self.min_heuristic = min(cell.poc for cell in self.valid_cell_list)/10
-        
         self.root_node = None
-        
-        #print(self.min_poc)
 
     def create_adjacency_dict(self):
         """Fills in a dictionary with keys as cells indexes and values as a list of indexes of adjacent cells"""
@@ -848,31 +626,28 @@ class AntColonyOpt_v2():
         #Create the dictionary entre for the first virtual node
         self.adj_dict[-1] = [idx for idx in range(len(self.valid_cell_list))]
 
-    def get_final_path_performance(self):
-        paths_idx = self.get_final_path()
-        return calculate_objective_multi(self.valid_cell_list, paths_idx, self.pod, self.factor)
-
     def get_final_path(self):
-        #Generate a full path starting at the root following the path of most pheromones
+        """Places an ant on the root node, and traverses the tree choosing the nodes that have the highest pheromone value. Returns the resulting UAV paths."""
         current_node = self.root_node
         paths_idx = [[] for _ in range(self.number_uavs)]
         while(self.is_not_terminal(current_node)):
             max_child = max(current_node.children, key=lambda x: x.pheromones)
-            #max_child = self.choose_child(current_node)
             paths_idx[max_child.last_uav_idx].append(max_child.cells_idx[max_child.last_uav_idx])
             current_node = max_child
         
         return paths_idx
     
-    def run_single_ACO(self, save_fig=0, fig_name=''):
+    def generate_uav_path(self, save_fig=0, fig_name=''):
+        """Generates the paths for the available UAVs using the ACO algorithm."""
         initial_cells = [-1 for _ in range(self.number_uavs)]
         self.root_node = ACO_Node(initial_cells, self.initial_energies, self.number_uavs-1, 0, self.evaporation)
 
         self.curr_iter = 0
+        #Run in a loop until the termination condition is met
         while self.curr_iter < self.max_iterations:
             #Generate a full path starting at the root
             current_node = self.root_node
-                        
+
             while(self.is_not_terminal(current_node)):
                 if len(current_node.children) == 0:
                     #The node is not terminal but hasnt been expanded yet
@@ -881,21 +656,20 @@ class AntColonyOpt_v2():
                 #Choose one of the children as the next node
                 current_node = self.choose_child(current_node)
             
-            #The pheromone evaporation is done passively every time a node is checked out
+            #The pheromone evaporation is done passively every time a node is checked out.
+            #When the algorithm need to check the pheromones deposited in a given node, those pheromones are updated to account for the evaporation.
             
             #Deposit the pheromones from the last path
             self.deposit_pheromones_from_last_node(current_node)
-            
-            #if self.curr_iter%1000 == 0:
-            #    print(self.curr_iter)
-                
+
             self.curr_iter += 1
         
+        #Place the special ant in the root node and traverses the tree one last time to get the final UAV paths
         self.paths_idx = self.get_final_path()
         self.paths = [[self.valid_cell_list[cell_idx] for cell_idx in path] for path in self.paths_idx]
         
         if save_fig==1:
-            f = open('./tese/code_var_poc/result_images/' + fig_name+'.txt', "a")
+            f = open('./results/' + fig_name+'.txt', "a")
             f.write("Using AntColonyOpt_v2 algorithm\n")
             f.write("Paths: " + str(self.paths_idx) + '\n')
             f.write("Total number of nodes explored: " + str(self.number_of_nodes) + '\n')
@@ -910,6 +684,7 @@ class AntColonyOpt_v2():
         return self.paths
         
     def is_not_terminal(self, node):
+        """Returns False if a node is terminal, and True otherwise. A node is considered to be terminal if none of the available UAVs has enough energy to perform another step."""
         if len(node.children) != 0:
             return True
         #A terminal node is also reached if all the cells have been visited
@@ -937,6 +712,7 @@ class AntColonyOpt_v2():
         return False
     
     def expand_node(self, node):
+        """Expands the node passed as an argument. It generates a child node for each action that can be taken by the selected UAV."""
         #Fully expands the current node
         current_node = node
         move_priority = list(range(current_node.last_uav_idx+1, self.number_uavs)) + list(range(0,current_node.last_uav_idx+1))
@@ -958,7 +734,6 @@ class AntColonyOpt_v2():
             energy_rem[uav] = current_node.uavs_energy_rem[uav] - self.energy_necessary(prev_cell,current_cell,next_cell)
             
             new_node = ACO_Node(positions, energy_rem, uav, self.curr_iter, self.evaporation, current_node)
-            #new_node.heuristic = self.calculate_heuristic(new_node)
             node.children.append(new_node)
             
             self.number_of_nodes += 1
@@ -967,6 +742,7 @@ class AntColonyOpt_v2():
     
     
     def possible_moves(self, node, uav):
+        """Creates a list of the actions that can be taken by the selected UAV, given its adjacent cells and its energy available."""
         moves = []
         current_cell = node.cells_idx[uav]
         prev_cell = self.get_prev_cell(node, uav)
@@ -976,6 +752,7 @@ class AntColonyOpt_v2():
         return moves
     
     def get_prev_cell(self, node, uav):
+        """Returns the second-to-last cell in the path of the selected UAV."""
         current_cell = node.cells_idx[uav]
         aux_node = node.parent
         while(aux_node is not None):
@@ -985,9 +762,11 @@ class AntColonyOpt_v2():
         return current_cell
     
     def energy_necessary(self, prev_cell, current_cell, next_cell):
+        """Calculates the energy necessary to perform a given action."""
         return self.distance_weight*self.calculate_distance(current_cell, next_cell) + self.turn_weight*self.calculate_turn(prev_cell,current_cell,next_cell)
     
     def calculate_distance(self, cell1_idx, cell2_idx):
+        """Calculates the distance between two cells."""
         if cell1_idx == -1:
             return 0
         cell1 = self.valid_cell_list[cell1_idx]
@@ -995,7 +774,7 @@ class AntColonyOpt_v2():
         return math.sqrt((cell1.x-cell2.x)**2+(cell1.y-cell2.y)**2)
 
     def calculate_turn(self, cell1_idx, cell2_idx, cell3_idx):
-        """Calculate the degrees involved in turing from cell1, 2 and 3"""
+        """Calculate the degrees involved in turing from cell1, 2 and 3."""
         if cell1_idx == -1 or cell2_idx == -1:
             return 0
         
@@ -1014,38 +793,13 @@ class AntColonyOpt_v2():
             angle = np.arccos(cos_angle)/np.pi*180
         return angle #in degrees
     
-    def choose_child_new(self, node, deterministic = False):
-        p_children = []
-        for child in node.children:            
-            pheromones = child.update_and_get_pheromones(self.curr_iter, self.evaporation)
-            prob = pheromones**self.alpha * child.heuristic ** self.beta
-            p_children.append(prob)
-        
-        sum_prob = sum(p_children)
-        p_children = [p/sum_prob for p in p_children]
-        
-        if deterministic:
-            max_value = max(p_children)
-            max_child_idx = p_children.index(max_value)
-            return node.children[max_child_idx]
-            
-        next_node = random.choices(node.children, weights=p_children)[0]
-        return next_node
-    
     def choose_child(self, node, deterministic = False):
+        """Choose the child node to which the ant is going to move, based on the ant decision formula."""
         p_children = []
         for child in node.children:
             new_cell_idx = child.cells_idx[child.last_uav_idx]
             pos_cumulative = (1-self.pod)**child.n_times_visited_prev * self.pod * self.valid_cell_list[new_cell_idx].poc
             heuristic = self.min_heuristic + pos_cumulative        
-            #heuristic = (self.min_poc*self.pod + pos_cumulative)/(self.max_poc*self.pod)
-            
-            #if child.visited_prev:
-            #    heuristic = self.min_heuristic
-            #else:
-            #    new_cell_idx = child.cells_idx[child.last_uav_idx]
-            #    heuristic = self.min_heuristic + self.valid_cell_list[new_cell_idx].poc
-            
             pheromones = child.update_and_get_pheromones(self.curr_iter, self.evaporation)
             prob = pheromones**self.alpha * heuristic ** self.beta
             p_children.append(prob)
@@ -1062,6 +816,7 @@ class AntColonyOpt_v2():
         return next_node
     
     def calculate_objective_func_from_last_node(self, last_node):
+        """Calculates the objective function value of the UAV paths that correspond to the tree node path that ends in last_node."""
         paths_idx = [[] for _ in range(self.number_uavs)]
         #paths_idx[max_child.last_uav_idx].append(max_child.cells_idx[max_child.last_uav_idx])
         path = last_node.get_nodes_in_path()
@@ -1072,6 +827,7 @@ class AntColonyOpt_v2():
         return objective
     
     def deposit_pheromones_from_last_node(self, last_node):
+        """Deposits the pheromones in all of the nodes in the tree path that ends in last_node."""
         objective_func = self.calculate_objective_func_from_last_node(last_node)
         aux_node = last_node
         while(aux_node is not None):
@@ -1079,91 +835,8 @@ class AntColonyOpt_v2():
             aux_node.update_and_get_pheromones(self.curr_iter, self.evaporation, self.Q*objective_func)
             aux_node = aux_node.parent
 
-    def get_next_cell_greedy_walk(self, cell_idx, visited_cells):
-        #Finds the next cell to visit in the simulated path
-        neighbours = self.adj_dict[cell_idx]
-        bias_neighbours = [(1-self.pod)**visited_cells[i]*self.pod*self.valid_cell_list[i].poc for i in neighbours]
-        if sum(bias_neighbours) == 0:
-            next_cell_idx = random.choice(neighbours)
-        else:
-            max_bias_idx = bias_neighbours.index(max(bias_neighbours))
-            next_cell_idx = neighbours[max_bias_idx]
-        return next_cell_idx
-    
-    def simulate_path_from_last_node(self, node):
-        paths_idx = self.get_paths_until_node(node)
-        energies_rem = copy.deepcopy(node.uavs_energy_rem)
-        stopped_uavs = [0 for i in range(self.number_uavs)]
-        
-        visited_cells = {i:0 for i in range(len(self.valid_cell_list))}
-        for aux_path in paths_idx:
-            for aux_cell in aux_path:
-                visited_cells[aux_cell] += 1
-        
-        uav = node.last_uav_idx + 1
-        while(1):
-            if all(stopped_uavs):
-                counter += 1
-                if counter == self.number_uavs:
-                    break
-            else:
-                counter = 0
-            if uav == self.number_uavs:
-                uav = 0
-            
-            if len(paths_idx[uav]) == 0:
-                current_cell = -1
-                prev_cell = -1
-            elif len(paths_idx[uav]) == 1:
-                current_cell = paths_idx[uav][-1]
-                prev_cell = -1
-            else:
-                current_cell = paths_idx[uav][-1]
-                prev_cell = paths_idx[uav][-2]
-            
-            next_cell = self.get_next_cell_greedy_walk(current_cell, visited_cells)
-                        
-            energy_necessary = self.energy_necessary(prev_cell, current_cell, next_cell)
-
-            if energies_rem[uav] > energy_necessary:
-                energies_rem[uav] -= energy_necessary
-                paths_idx[uav].append(next_cell)
-                visited_cells[next_cell] += 1
-                stopped_uavs[uav] = 0
-            else:
-                stopped_uavs[uav] = 1
-
-            uav += 1
-        return paths_idx
-    
-    def get_paths_until_node(self, node):
-        node_path = node.get_nodes_in_path()
-        paths_idx = [[] for i in range(self.number_uavs)]
-        
-        if len(node_path) <= 1:
-            return paths_idx
-        
-        for aux_node in node_path[1:]:
-            last_moved_uav = aux_node.last_uav_idx
-            last_moved_cell = aux_node.cells_idx[last_moved_uav]
-            paths_idx[last_moved_uav].append(last_moved_cell)
-        
-        return paths_idx #Does not include -1
-
-    def calculate_heuristic(self, node):
-        
-        #new_cell_idx = node.cells_idx[node.last_uav_idx]
-        #pos_cumulative = (1-self.pod)**node.n_times_visited_prev * self.pod * self.valid_cell_list[new_cell_idx].poc
-        #heuristic = self.min_heuristic + pos_cumulative
-        
-        #Simulate a case for the rest of the path
-        paths_idx = self.simulate_path_from_last_node(node)
-        #Calculate the objective function for these
-        heuristic = calculate_objective_multi(self.valid_cell_list, paths_idx, self.pod, self.factor)
-        return heuristic
-    
-
-class MonteCarloSearch():
+class MonteCarloTreeSearch():
+    """Class that describes the functions necessary for the implementation of the Monte Carlo Tree Search algorithm."""
     def __init__(self, cell_list, d, initial_energies, number_uavs, pod):
         self.number_uavs = number_uavs
         self.initial_guess_list = []
@@ -1183,8 +856,7 @@ class MonteCarloSearch():
         self.final_node_selection = 0 #0 - max child, 1 - robust child, 2 - secure child
         self.A = 4 #only used in the secure child case
         self.n_rollouts_per_sim = 1
-        #self.c = math.sqrt(2)
-        self.c = 0.01
+        self.c = 1e-12
         self.terminal_state_reached = 0
         
         self.create_adjacency_dict()
@@ -1651,7 +1323,7 @@ class MonteCarloSearch():
         return max_child
         
     
-    def generate_path(self, time_limit, save_fig=0, fig_name=''):
+    def generate_uav_path(self, time_limit, save_fig=0, fig_name=''):
         initial_cells = [-1 for i in range(self.number_uavs)]
         #Create the root node - all the UAVs are in a virtual cell that can access anywhere in the space
         root_node = MCS_Node(initial_cells, self.initial_energies, self.number_uavs-1)
@@ -1707,3 +1379,5 @@ class MonteCarloSearch():
             f.write("Total number of nodes explored: " + str(self.number_of_nodes) + '\n')
             f.write("Effective branching factor: " + str(self.calculate_eff_branching_factor()) + "\n")
             f.close()
+        
+        return self.paths

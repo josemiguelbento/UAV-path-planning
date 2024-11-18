@@ -86,44 +86,8 @@ class Mission():
         self.h_sensor = 50 #meters
         self.p_o = 50 #percentage of overlap
         
-    def generate_grid(self):
-        #grid size calculation
-        self.d = 2*(1-self.p_o/100)*self.h_sensor*math.tan(self.hfov/2) #as per eq 3.1 in PAer report
-        
-        #Calculate the CG of the grid and its size
-        CG_grid, m = define_initial_grid(self.AOI_vertices, self.d)
-        
-        #Calculate the centers of the grid cells
-        self.cell_centers = calculate_grid_cells_centers(CG_grid, m, self.d)
-        
-        #self.AOI_polygon = geom.polygon.Polygon(self.AOI_vertices)
-        #self.NFZ_polygons = [geom.polygon.Polygon(vert) for vert in self.NFZ_vertices]
-        
-        #Check if the points are inside the AOI
-        for cell in self.cell_centers:
-            point = geom.Point(cell.x, cell.y)
-            cell.status = self.AOI_polygon.contains(point) #A cell is valid if its center is inside the AOI
-        
-        #Calculate the POC map
-        #self.cell_centers = calculate_poc_v3(self.cell_centers, self.POC_x0_list, self.POC_y0_list, self.POC_sigma_x_list, self.POC_sigma_y_list)
-        
-        #Check if the points are inside the NFZ   
-        for cell in self.cell_centers:
-            cell_polygon = geom.polygon.Polygon([[cell.x+self.d/2, cell.y+self.d/2], [cell.x+self.d/2, cell.y-self.d/2], [cell.x-self.d/2, cell.y-self.d/2], [cell.x-self.d/2, cell.y+self.d/2]])
-            for poly in self.NFZ_polygons:
-                if cell_polygon.intersects(poly):
-                    cell.status = 0
-                    break
-                
-        #Calculate the POC map
-        self.cell_centers = calculate_poc_v2(self.cell_centers, self.POC_x0_list, self.POC_y0_list, self.POC_sigma_x_list, self.POC_sigma_y_list)
-        
-        total_poc = sum([cell.poc for cell in self.cell_centers if cell.status == 1])
-        print("Total poc:", total_poc)
-        
-        return copy.deepcopy(self.cell_centers)
     
-    def generate_optimal_grid(self, theta = 0, sx = 0, sy = 0):
+    def generate_grid(self, theta = 0, sx = 0, sy = 0):
         #grid size calculation
         self.d = 2*(1-self.p_o/100)*self.h_sensor*math.tan(self.hfov/2) #as per eq 3.1 in PAer report
         
@@ -1012,7 +976,7 @@ def evaluate_paths_multi(paths, cell_centers, pod, save_fig, fig_name):
     
     
     if save_fig == 1:
-        f = open('./tese/code_var_poc/result_images/' + fig_name+'.txt', "a")
+        f = open('./results/' + fig_name+'.txt', "a")
         f.write("Path distance (m): " + str(distances)+'\n')
         f.write("Turns (deg): " + str(turns)+'\n')
         f.write("Energy expended (kJ): " + str(energies_expended)+'\n')
@@ -1834,6 +1798,7 @@ class MCS_Node:
         
         
 class ACO_Node:
+    """Node structure used in the ACO tree."""
     def __init__(self, cells_idx, uavs_energy_rem, last_uav_idx, curr_iter, evaporation, parent = None):
         self.last_uav_idx = last_uav_idx
         self.cells_idx = cells_idx #The index of the current cells of the UAVs
@@ -1841,12 +1806,12 @@ class ACO_Node:
         self.parent = parent
         self.children = []
         self.pheromones = (1-evaporation)**curr_iter
-        #self.visited_prev = self.check_if_visited_prev()
         self.n_times_visited_prev = self.number_times_visited_prev()
         self.last_pheromone_update = curr_iter
         self.heuristic = 0
     
     def get_nodes_in_path(self):
+        """Returns the node path until the current node."""
         aux_node = self
         path = []
         while(aux_node is not None):
@@ -1855,29 +1820,19 @@ class ACO_Node:
         path.reverse()
         return path
     
-    def check_if_visited_prev(self):
-        aux_node = self
-        aux_node = aux_node.parent
-        while(aux_node is not None):
-            if self.cells_idx[self.last_uav_idx] in aux_node.cells_idx:
-                return True
-            aux_node = aux_node.parent
-        return False
-    
     def number_times_visited_prev(self):
+        """Returns the number of times that the cell visited by the UAV that moved in the current node, has been covered in the past by the any UAV."""
         n_times = 0
         aux_node = self
         aux_node = aux_node.parent
         while(aux_node is not None):
             if self.cells_idx[self.last_uav_idx] == aux_node.cells_idx[aux_node.last_uav_idx]:
                 n_times += 1
-            #if self.cells_idx[self.last_uav_idx] in aux_node.cells_idx:
-            #    return True
             aux_node = aux_node.parent
-        #return False
         return n_times
     
     def update_and_get_pheromones(self, curr_iter, evaporation, deposit = 0):
+        """Returns and updates the value of the pheromones in the current node."""
         self.pheromones = (1-evaporation)**(curr_iter-self.last_pheromone_update) *self.pheromones + deposit
         self.last_pheromone_update = curr_iter
         return self.pheromones
