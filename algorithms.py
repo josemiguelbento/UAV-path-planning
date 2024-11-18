@@ -154,9 +154,9 @@ class SimulatedAnnealing():
         self.neighbour_cases = [1,2,3,4,5]
         self.pod = pod
 
-        self.L_k = 100#2653
+        self.L_k = 2653
         self.initial_temp = 1.83e-4
-        self.cooling_factor = 0.9#0.954
+        self.cooling_factor = 0.954
         self.final_temp = 2.11e-5
         
         self.create_adjacency_dict()

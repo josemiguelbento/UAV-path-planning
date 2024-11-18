@@ -29,7 +29,6 @@ def main(algorithm, save_res, filename):
     #cm/pixel
     #cm_p_pixel = 2*h_sensor*math.tan(hfov/2)/num_pixels*100
     
-    #mission = Mission('simple_square')
     #mission = Mission(1)
     mission = Mission(2,seed=34)
     
@@ -68,7 +67,7 @@ def main(algorithm, save_res, filename):
     elif algorithm == 'SA':
         type_init = 0
         sync = 0
-        n_threads = 2
+        n_threads = 15
         SA = SimulatedAnnealing(cell_centers, d, type_init, n_threads, sync, energy_uavs, number_uavs, pod)
         SA.factor = decay_factor
         SA.generate_uav_path(save_res, filename)
