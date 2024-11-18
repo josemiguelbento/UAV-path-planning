@@ -30,14 +30,20 @@ In order to randomize the mission creation process, a method for generating rand
 The paths of the swarm of UAVs can be generated using any of the proposed algorithms for a given mission, by running a command in the Linux terminal.
 
 The required structure of command line arguments is the following:
-     python main.py <host> <algorithm> [save result] [file name]
+```
+python main.py <host> <algorithm> [save result] [file name]
+```
 
 The following options are available:
-     host (required argument): local or remote
-     algorithm (required argument): UninfAtt, Att, SA, ACO or MCTS
-     save result (optional argument, default 0): 0 or 1
-     file name (optional argument, default is date-time): whatever_name_you_want
+
+\begin{itemize}
+    \item host (required argument): local or remote
+    \item algorithm (required argument): UninfAtt, Att, SA, ACO or MCTS
+    \item save result (optional argument, default 0): 0 or 1
+    \item file name (optional argument, default is date-time): whatever_name_you_want
+\end{itemize}
 
 Example command:
-     python main.py local Att 1 john_file_doe
-
+```
+python main.py local Att 1 john_file_doe
+```
