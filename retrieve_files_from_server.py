@@ -3,7 +3,7 @@ import os
 
 client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-client.connect('', username='', password='')
+client.connect(hostname = '', username='', password='')
 
 
 sftp = client.open_sftp()

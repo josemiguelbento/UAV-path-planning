@@ -19,21 +19,18 @@ import time
 from scipy import integrate
 
 class Mission():
-    def __init__(self, mission_selection, seed = 0):
-        if mission_selection == 0:
+    """Class that defines a mission instance."""
+    def __init__(self, mission_selection = 0, seed = 0, hfov = 84, h_sensor = 50, p_o = 50):
+        if mission_selection == 0: #Pre-defined mission with a small AOI and a POC map with a single gaussian distribution.
             self.AOI_vertices = [[50, 50], [1525, 500], [2400, 1250], [1200, 2350],  [50, 1500]]
             self.AOI_polygon = geom.polygon.Polygon(self.AOI_vertices)
             self.NFZ_vertices = [[[550,550], [550, 950], [950, 950], [950, 550]]]
             self.NFZ_polygons = [geom.polygon.Polygon(vert) for vert in self.NFZ_vertices]
-            self.POC_x0_list = [1500]
-            self.POC_y0_list = [1500]
-            self.POC_sigma_x_list = [1000]
-            self.POC_sigma_y_list = [1000]
             self.POC_weights = [1]
             self.POC_means = [[1500,1500]]
             self.POC_variance_matrices = [[[1000**2, 0],[0, 1000**2]]]
             
-        elif mission_selection == 1:
+        elif mission_selection == 1: #Pre-defined mission with a medium-sized AOI and a POC map with a weighted sum of five different gaussian distributions.
             self.AOI_vertices = [[50, 1000], [1500, 50], [4800, 1000], [4000, 3500], [2000, 4000], [50, 3000]]
             self.AOI_polygon = geom.polygon.Polygon(self.AOI_vertices)
             self.NFZ_vertices = [[[1050,950], [1050, 1550], [1450, 1450], [1450, 1050]],
@@ -44,25 +41,11 @@ class Mission():
                                   [[3550,1050], [4050, 1150], [3750, 1550]],
                                   [[2050,3050], [2050, 3450], [2450, 3450], [2450, 3050]]]
             self.NFZ_polygons = [geom.polygon.Polygon(vert) for vert in self.NFZ_vertices]
-            self.POC_x0_list = [1200, 3000, 2300, 4000, 3100]
-            self.POC_y0_list = [3000, 3500, 2100, 2400, 1100]
-            self.POC_sigma_x_list = [500, 500, 300, 500, 500]
-            self.POC_sigma_y_list = [500, 500, 300, 500, 500]
             self.POC_weights = [1,1,9/25,1,1]
             self.POC_means = [[1200,3000], [3000,3500], [2300,2100], [4000,2400], [3100,1100]]
             self.POC_variance_matrices = [[[500**2, 0],[0, 500**2]], [[500**2, 0],[0, 500**2]], [[300**2, 0],[0, 300**2]], [[500**2, 0],[0, 500**2]], [[500**2, 0],[0, 500**2]]]
-            
-        elif mission_selection == 'simple_square':
-            self.AOI_vertices = [[0,0], [1000,0], [1000,1000], [0,1000]]
-            self.AOI_polygon = geom.polygon.Polygon(self.AOI_vertices)
-            self.NFZ_vertices = []
-            self.NFZ_polygons = [geom.polygon.Polygon(vert) for vert in self.NFZ_vertices]
-            self.POC_x0_list = [800, 200, 500]
-            self.POC_y0_list = [800, 200, 500]
-            self.POC_sigma_x_list = [200, 200, 200]
-            self.POC_sigma_y_list = [200, 200, 200]
-        
-        else: #randomize the mission
+
+        else: #randomized mission scenario and POC map.
             random.seed(seed)
             #Randomly generate an AOI
             size_scale = random.uniform(0.2, 1.7)
@@ -82,9 +65,9 @@ class Mission():
             self.POC_variance_matrices = [[[POC_sigma_x**2, correlation*POC_sigma_x*POC_sigma_y],[correlation*POC_sigma_x*POC_sigma_y, POC_sigma_y**2]] for (correlation, POC_sigma_x, POC_sigma_y) in zip(correlation_list, POC_sigma_x_list, POC_sigma_y_list)]
             
         #sensor data from a DJI phantom 4 pro
-        self.hfov = 84 #field of view in degrees
-        self.h_sensor = 50 #meters
-        self.p_o = 50 #percentage of overlap
+        self.hfov = hfov #field of view in degrees
+        self.h_sensor = h_sensor #meters
+        self.p_o = p_o #percentage of overlap
         
     
     def generate_grid(self, theta = 0, sx = 0, sy = 0):
@@ -106,10 +89,7 @@ class Mission():
             cell.status = self.AOI_polygon.contains(point) #A cell is valid if its center is inside the AOI
         
         #Calculate the POC map
-        #self.cell_centers = calculate_poc_v3(self.cell_centers, self.POC_x0_list, self.POC_y0_list, self.POC_sigma_x_list, self.POC_sigma_y_list)
-        #self.cell_centers = calculate_poc_v4(self.d, self.cell_centers, self.POC_weights, self.POC_means, self.POC_variance_matrices)
-        #self.cell_centers = calculate_poc_v5(self.d, self.cell_centers, self.POC_weights, self.POC_means, self.POC_variance_matrices)
-        self.cell_centers = calculate_poc_v6(self.d, self.cell_centers, self.POC_weights, self.POC_means, self.POC_variance_matrices, theta)
+        self.cell_centers = calculate_poc(self.d, self.cell_centers, self.POC_weights, self.POC_means, self.POC_variance_matrices, theta)
         
         r = math.sqrt(2)*self.d/2
         #Check if the points are inside the NFZ
@@ -201,10 +181,7 @@ class Mission():
             cell.status = self.AOI_polygon.contains(point) #A cell is valid if its center is inside the AOI
         
         #Calculate the POC map
-        #self.cell_centers = calculate_poc_v3(self.cell_centers, self.POC_x0_list, self.POC_y0_list, self.POC_sigma_x_list, self.POC_sigma_y_list)
-        #self.cell_centers = calculate_poc_v4(self.d, self.cell_centers, self.POC_weights, self.POC_means, self.POC_variance_matrices)
-        #self.cell_centers = calculate_poc_v5(self.d, self.cell_centers, self.POC_weights, self.POC_means, self.POC_variance_matrices)
-        self.cell_centers = calculate_poc_v6(self.d, self.cell_centers, self.POC_weights, self.POC_means, self.POC_variance_matrices, theta)
+        self.cell_centers = calculate_poc(self.d, self.cell_centers, self.POC_weights, self.POC_means, self.POC_variance_matrices, theta)
         
         r = math.sqrt(2)*self.d/2
         #Check if the points are inside the NFZ
@@ -273,10 +250,7 @@ class black_box_function_AOI:
                     break
         
         #Calculate the POC map
-        #cell_centers = calculate_poc_v3(cell_centers, self.POC_x0_list, self.POC_y0_list, self.POC_sigma_x_list, self.POC_sigma_y_list)
-        #cell_centers = calculate_poc_v4(self.d, cell_centers, self.POC_weights, self.POC_means, self.POC_variance_matrices)
-        #cell_centers = calculate_poc_v5(self.d, cell_centers, self.POC_weights, self.POC_means, self.POC_variance_matrices)
-        cell_centers = calculate_poc_v6(self.d, cell_centers, self.POC_weights, self.POC_means, self.POC_variance_matrices, theta)
+        cell_centers = calculate_poc(self.d, cell_centers, self.POC_weights, self.POC_means, self.POC_variance_matrices, theta)
         
         total_poc = sum([cell.poc for cell in cell_centers if cell.status == 1])
         
@@ -568,127 +542,12 @@ def plot_grid(cell_centers, d, ax, sx, sy, theta):
         square_patch = ptch.Polygon(square, alpha=0.05, facecolor = 'w',edgecolor = 'k')
         ax.add_patch(square_patch)
 
-def calculate_poc(cell_centers, x0, y0, sigma_x, sigma_y, uniform_flag = False):
-    for cell in cell_centers:
-        if cell.status == 1:
-            if uniform_flag:
-                cell.poc = 1
-            else:
-                x = cell.x
-                y = cell.y
-                cell.poc = math.exp(-((x - x0)**2/(2*sigma_x**2) + (y - y0)**2/(2*sigma_y**2)))
-    
-    norm_const = sum([cell.poc for cell in cell_centers])
-    #print(norm_const)
-    for cell in cell_centers:
-        cell.poc = cell.poc/norm_const
-    
-    return cell_centers
-
-def calculate_poc_v2(cell_centers, x0_list, y_0_list, sigma_x_list, sigma_y_list):
-    for cell in cell_centers:
-        if cell.status == 1:
-            x = cell.x
-            y = cell.y
-            cell.poc = 0
-            for (x0, y0, sigma_x, sigma_y) in zip(x0_list, y_0_list, sigma_x_list, sigma_y_list):
-                cell.poc += math.exp(-((x - x0)**2/(2*sigma_x**2) + (y - y0)**2/(2*sigma_y**2)))
-            #Scaling for the number of elements in the list
-            cell.poc = cell.poc/len(x0_list)
-            
-    norm_const = sum([cell.poc for cell in cell_centers])
-    #print(norm_const)
-    for cell in cell_centers:
-        cell.poc = cell.poc/norm_const
-    
-    return cell_centers
-
-def calculate_poc_v3(cell_centers, x0_list, y_0_list, sigma_x_list, sigma_y_list):
-    """Considers that the target might be inside a NFZ, and is definitely inside the AOI"""
-    for cell in cell_centers:
-        if cell.status == 1:
-            x = cell.x
-            y = cell.y
-            cell.poc = 0
-            for (x0, y0, sigma_x, sigma_y) in zip(x0_list, y_0_list, sigma_x_list, sigma_y_list):
-                #cell.poc += math.exp(-((x - x0)**2/(2*sigma_x**2) + (y - y0)**2/(2*sigma_y**2)))
-                cell.poc += math.exp(-((x - x0)**2/(2*sigma_x**2) + (y - y0)**2/(2*sigma_y**2)))
-            #Scaling for the number of elements in the list
-            cell.poc = cell.poc/len(x0_list)
-        else:
-            cell.poc = 0
-            
-    norm_const = sum([cell.poc for cell in cell_centers])
-    #print(norm_const)
-    for cell in cell_centers:
-        cell.poc = cell.poc/norm_const
-    
-    return cell_centers
-
-def calculate_poc_v4(d, cell_centers, POC_weights, POC_means, POC_variance_matrices):
-    """Considers that the target might be inside a NFZ, and is definitely inside the AOI"""
-    #https://math.stackexchange.com/questions/920252/finite-discrete-approximation-to-the-normal-distribution
-    #This discrete approximation of the gaussian distribution does not work well for very low uncertainties (<100)
-    cell_area = d**2
-    for cell in cell_centers:
-        if cell.status == 1:
-            cell.poc = 0
-            for (weight, mean, variance_matrix) in zip(POC_weights, POC_means, POC_variance_matrices):
-                #cell.poc += math.exp(-((x - x0)**2/(2*sigma_x**2) + (y - y0)**2/(2*sigma_y**2)))
-                xy_pos = np.array([[cell.x, cell.y]])
-                xy_mean = np.array([mean])
-                var = np.array(variance_matrix)
-                cell.poc += weight * cell_area * 1/(2*math.pi*math.sqrt(np.linalg.det(variance_matrix))) * (math.exp(-0.5 * (xy_pos-xy_mean) @ np.linalg.inv(var) @ (xy_pos-xy_mean).T)) 
-            #Scaling for the sum of the weights of the elements in the list
-            cell.poc = cell.poc/sum(POC_weights)
-        else:
-            cell.poc = 0
-            
-    #norm_const = sum([cell.poc for cell in cell_centers])
-    #print(norm_const)
-    #for cell in cell_centers:
-    #    cell.poc = cell.poc/norm_const
-    
-    return cell_centers
-
 def gaussian_func(weight, mean, variance_matrix):
     xy_mean = np.array([mean])
     var = np.array(variance_matrix)
     return lambda y, x: weight * 1/(2*math.pi*math.sqrt(np.linalg.det(variance_matrix))) * (math.exp(-0.5 * (np.array([[x, y]])-xy_mean) @ np.linalg.inv(var) @ (np.array([[x, y]]-xy_mean).T)))
 
-def calculate_poc_v5(d, cell_centers, POC_weights, POC_means, POC_variance_matrices):
-    """Considers that the target might be inside a NFZ, and is definitely inside the AOI"""
-    #https://math.stackexchange.com/questions/920252/finite-discrete-approximation-to-the-normal-distribution
-    #This discrete approximation of the gaussian distribution does not work well for very low uncertainties (<100)
-    
-    gaussian_funcs = []
-    for (weight, mean, variance_matrix) in zip(POC_weights, POC_means, POC_variance_matrices):
-        #xy_mean = np.array([mean])
-        #var = np.array(variance_matrix)
-        #gauss_f = lambda x, y: weight * 1/(2*math.pi*math.sqrt(np.linalg.det(variance_matrix))) * (math.exp(-0.5 * (np.array([[x, y]])-xy_mean) @ np.linalg.inv(var) @ (np.array([[x, y]]-xy_mean).T)))
-        gauss_f = gaussian_func(weight, mean, variance_matrix)
-        gaussian_funcs.append(gauss_f)
-    
-    for cell in cell_centers:
-        if cell.status == 1:
-            cell.poc = 0
-            for gauss_func in gaussian_funcs:
-                #(result, err) = integrate.dblquad(gauss_func, cell.x-d/2, cell.x+d/2, cell.y-d/2, cell.y+d/2) #does not rotate with the grid
-                (result, err) = integrate.dblquad(gauss_func, cell.x-d/2, cell.x+d/2, cell.y-d/2, cell.y+d/2, epsabs=1e-1, epsrel=1e-1)
-                cell.poc += result
-            #Scaling for the sum of the weights of the elements in the list
-            cell.poc = cell.poc/sum(POC_weights)
-        else:
-            cell.poc = 0
-    
-    return cell_centers
-
-def rotated_gaussian_func1(x, y, x0=0, y0=0, theta=0, func=0):
-    qx = x0 + math.cos(theta) * (x - x0) - math.sin(theta) * (y - y0)
-    qy = y0 + math.sin(theta) * (x - x0) + math.cos(theta) * (y - y0)
-    return func(qy, qx)
-
-def calculate_poc_v6(d, cell_centers, POC_weights, POC_means, POC_variance_matrices, theta):
+def calculate_poc(d, cell_centers, POC_weights, POC_means, POC_variance_matrices, theta):
     """Considers that the target might be inside a NFZ, and is definitely inside the AOI"""
     #Takes 4 seconds to compute the integral
     gaussian_funcs = []
@@ -877,64 +736,6 @@ def calculate_objective_multi(valid_cell_list, paths, pod, decay_factor = 0.01):
                 times_visited_dict[path[step]]+=1
     return obj
     
-def evaluate_path(path, cell_centers, save_fig, fig_name):
-    """Calculates the overall distance covered, as well as the turns performed"""
-    distance = 0
-    turns = 0
-    for idx in range(len(path)-1):
-        distance = distance + math.sqrt((path[idx+1].x - path[idx].x)**2 + (path[idx+1].y - path[idx].y)**2)
-        
-    for idx in range(len(path)-3):
-        turns = turns + calculate_turn(path[idx], path[idx+1], path[idx+2]) #in degrees7
-
-    turn_weight = 0.0173
-    distance_weight = 0.1164
-    print("Path distance (m): ", "{:.1f}".format(distance))
-    print("Turns (deg): ", "{:.1f}".format(turns))
-    print("Energy expended (kJ): ", "{:.1f}".format(turn_weight*turns+distance_weight*distance))
-    
-    order = 0
-    decay_factor = 0.01
-    objective = 0
-    not_prev_visited = 1
-    path_cost = 0
-    for cell in path:
-        idx_total_list, aux = search_for_cell_ij(cell_centers, cell.i,cell.j)
-        POC = cell_centers[idx_total_list].poc
-        if order != 0:
-            idx, aux = search_for_cell_ij(path[0:order], cell.i,cell.j)
-            if idx == None:
-                not_prev_visited = 1
-            else:
-                not_prev_visited = 0
-        #objective += decay_factor*math.exp(-decay_factor*order)*POC*not_prev_visited
-        #path_cost += decay_factor*(1-math.exp(-decay_factor*order))*POC*not_prev_visited
-        objective += math.exp(-decay_factor*order)*POC*not_prev_visited
-        path_cost += (1-math.exp(-decay_factor*order))*POC*not_prev_visited
-        order += 1
-    print("Objective function: ", objective)
-    
-    valid_cell_list = [cell for cell in cell_centers if cell.status == 1]
-    path_idx = []
-    for cell in path:
-        idx_valid_list, aux = search_for_cell_ij(valid_cell_list, cell.i,cell.j)
-        path_idx.append(idx_valid_list)
-    
-    detect_perc = 1-calculate_missed_detections(valid_cell_list, path_idx)
-    print("Detection percentage: ", detect_perc*100)
-    
-    avg_detect_step = calculate_avg_detection_step(valid_cell_list, path_idx)
-    print("Average detection step: ", avg_detect_step)
-    
-    if save_fig == 1:
-        f = open('./tese/code/result_images/' + fig_name+'.txt', "a")
-        f.write("Path distance (m): " + "{:.1f}".format(distance)+'\n')
-        f.write("Turns (deg): " + "{:.1f}".format(turns)+'\n')
-        f.write("Energy expended (kJ): " + "{:.1f}".format(turn_weight*turns+distance_weight*distance)+'\n')
-        f.write("Objective function: " + str(objective)+'\n')
-    #print("path cost = ", path_cost/decay_factor)
-    return objective, detect_perc, avg_detect_step
-
 def evaluate_paths_multi(paths, cell_centers, pod, save_fig, fig_name):
     """Calculates the overall distance covered, as well as the turns performed"""
     distances = [0 for path in paths]
@@ -950,8 +751,8 @@ def evaluate_paths_multi(paths, cell_centers, pod, save_fig, fig_name):
     distance_weight = 0.1164
     energies_expended = [turn_weight*turn+distance_weight*distance for turn, distance in zip(turns, distances)]
     print("Paths distance (m): ", distances)
-    print("Turns (deg): ", turns)
-    print("Energy expended (kJ): ", energies_expended)
+    print("Sum of the turn angles in the path (deg): ", turns)
+    print("Energy required for the paths (kJ): ", energies_expended)
     
     valid_cell_list = [cell for cell in cell_centers if cell.status == 1]
     paths_idx = []
@@ -963,28 +764,26 @@ def evaluate_paths_multi(paths, cell_centers, pod, save_fig, fig_name):
         paths_idx.append(aux_list)
     
     total_poc = sum(cell.poc for cell in valid_cell_list)
-    print("Total poc: ", total_poc)
+    print("Total mission POC: ", total_poc*100, "%")
     
     objective = calculate_objective_multi(valid_cell_list, paths_idx, pod)
-    print("Objective function: ", objective)
+    print("Objective function J = ", objective)
     
     detect_perc = calculate_detections_multi(valid_cell_list, paths_idx, pod)
-    print("Detection percentage: ", detect_perc*100)
+    print("Cumulative probability of success POS_c = ", detect_perc*100, "%")
     
     avg_detect_step = calculate_avg_detection_step_multi(valid_cell_list, paths_idx, pod)
-    print("Average detection step: ", avg_detect_step)
+    print("Expected detection time EDT (in UAV steps) = ", avg_detect_step)
     
     
     if save_fig == 1:
         f = open('./results/' + fig_name+'.txt', "a")
-        f.write("Path distance (m): " + str(distances)+'\n')
-        f.write("Turns (deg): " + str(turns)+'\n')
-        f.write("Energy expended (kJ): " + str(energies_expended)+'\n')
-        f.write("Total poc: " + str(total_poc)+'\n')
-        f.write("Objective function: " + str(objective)+'\n')
-        f.write("Detection percentage: " + str(detect_perc*100)+'\n')
-        f.write("Average detection step: " + str(avg_detect_step)+'\n')
-    #print("path cost = ", path_cost/decay_factor)
+        f.write("Paths distance (m): " + str(distances)+'\n')
+        f.write("Sum of the turn angles in the path (deg): " + str(turns)+'\n')
+        f.write("Energy required for the paths (kJ): " + str(energies_expended)+'\n')
+        f.write("Objective function J = " + str(objective)+'\n')
+        f.write("Cumulative probability of success POS_c = " + str(detect_perc*100)+'\n')
+        f.write("Expected detection time EDT (in UAV steps) = " + str(avg_detect_step)+'\n')
     return objective, detect_perc, avg_detect_step
 
         

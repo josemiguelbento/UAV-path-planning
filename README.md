@@ -12,7 +12,7 @@ The code was developed for Python 3.10.12, and the necessary dependencies can be
 pip install -r ./requirements.txt
 ```
 
-This code was developted in order to easily be run in a remote server. If a server is available, fill out the hostname, username and password in line 254 of "main.py". In order to use this functionality, the following library is also required:
+This code was developted in order to easily be run in a remote server. If a server is available, fill out the hostname, username and password in line 215 of "main.py". In order to use this functionality, the following library is also required:
 ```
 pip install paramiko
 ```
@@ -25,6 +25,8 @@ A mission instance created using Mission(0) corresponds to simple mission enviro
 A mission instance created using Mission(1) corresponds to complex mission environment with several NFZs, and with the POC map represented by a weighted sum of 5 different gaussian probability distributions. This map represents a mission where multiple and possibly conflicting target position reports are available.
 
 In order to randomize the mission creation process, a method for generating random AOIs, NFZs and POC maps was implemented. These can be created using Mission(2), and the seed used for the generation can also be passed as a parameter. It should be noted that this randomization process sometimes results in missions where the valid cells are not fully-connected, and therefore, the UAVs might not be able to visit all of them. The following list of mission seeds will result in a set of missions that are representative of real-world SAR missions: [72, 28, 59, 76, 71, 41, 88, 63, 34, 29, 50, 37, 95, 22, 78, 23, 62].
+
+In order to perform the grid placement optimization discussed in the Appendix of the thesis, change the flag "optimize_grid" to True in the line 35 of "main.py".
 
 ## Generating the paths of the UAVs using the available algorithms
 The paths of the swarm of UAVs can be generated using any of the proposed algorithms for a given mission, by running a command in the Linux terminal.

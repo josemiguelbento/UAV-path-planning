@@ -558,11 +558,11 @@ class SimulatedAnnealing():
         accepted_path = self.threads_paths[i]
         if save_res==1:
             f = open('./results/' + filename+'.txt', "a")
-            f.write("Using simulated annealing v2\n")
+            f.write("\nUsing the Simulated Annealing algorithmn\n")
             if self.type_init == 0:
-                f.write("Initialized with Attraction algorithm\n")
+                f.write("Initial guess generated using the Attraction algorithm.\n")
             elif self.type_init == 1:
-                f.write("Initialized with Random walk\n")
+                f.write("Initial guess generated using Random walk.\n")
             f.write("Initial temp: " + str(self.initial_temp) + '\n')
             f.write("L_k: " + str(self.L_k) + '\n')
             f.write("Final temp: " + str(self.final_temp) + '\n')
@@ -843,13 +843,12 @@ class MonteCarloTreeSearch():
         self.valid_cell_list = [cell for cell in cell_list if cell.status == 1]
         self.paths = []
         self.paths_idx = []
-        self.d = 0
+        self.d = d
         self.initial_energies = initial_energies
         self.adj_dict = {idx:[] for idx in range(len(self.valid_cell_list))}
         self.factor = 0.01
         self.turn_weight = 0.0173
         self.distance_weight = 0.1164
-        self.min_energy = self.distance_weight * self.d
         self.number_of_nodes = 0
         self.number_of_iterations = 0
         self.pod = pod
@@ -870,11 +869,10 @@ class MonteCarloTreeSearch():
                     self.adj_dict[idx1].append(idx2)
                     self.adj_dict[idx2].append(idx1)
         #Create the dictionary entre for the first virtual node
-        self.adj_dict[-1] = [idx for idx in range(len(self.valid_cell_list))]
-        #self.adj_dict[-1] = [2]
-        
-        
+        self.adj_dict[-1] = [idx for idx in range(len(self.valid_cell_list))]        
+    
     def get_prev_cell(self, node, uav):
+        """Returns the second-to-last cell in the path of the selected UAV."""
         current_cell = node.cells_idx[uav]
         aux_node = node.parent
         while(aux_node is not None):
@@ -904,6 +902,7 @@ class MonteCarloTreeSearch():
         return angle #in degrees
     
     def calculate_distance(self, cell1_idx, cell2_idx):
+        """Calculates the distance between two valid cells."""
         if cell1_idx == -1:
             return 0
         cell1 = self.valid_cell_list[cell1_idx]
@@ -911,25 +910,11 @@ class MonteCarloTreeSearch():
         return math.sqrt((cell1.x-cell2.x)**2+(cell1.y-cell2.y)**2)
     
     def energy_necessary(self, prev_cell, current_cell, next_cell):
+        """Calculates the energy necessary for a UAV to travel from current_cell to next_cell."""
         return self.distance_weight*self.calculate_distance(current_cell, next_cell) + self.turn_weight*self.calculate_turn(prev_cell,current_cell,next_cell)
         
     def is_not_terminal(self, node):
-        
-        """
-        #A terminal node is also reached if all the cells have been visited
-        visited_list = []
-        aux_node = node
-        while(aux_node is not None):
-            for uav in range(self.number_uavs):
-                if aux_node.cells_idx[uav] not in visited_list and aux_node.cells_idx[uav] != -1:
-                    visited_list.append(aux_node.cells_idx[uav])
-            aux_node = aux_node.parent
-        
-        if len(visited_list)==len(self.valid_cell_list):
-            return False
-        """
-        
-        #A terminal node is reached if none of the UAVs have energy left for more moves
+        """Returns False if a node is terminal, and True otherwise. A node is considered to be terminal if none of the available UAVs has enough energy to perform another step."""
         for uav in range(self.number_uavs):
             current_cell = node.cells_idx[uav]
             prev_cell = self.get_prev_cell(node, uav)
@@ -939,6 +924,7 @@ class MonteCarloTreeSearch():
         return False
     
     def possible_moves(self, node, uav):
+        """Creates a list of the actions that can be taken by the selected UAV, given its adjacent cells and its energy available."""
         moves = []
         current_cell = node.cells_idx[uav]
         prev_cell = self.get_prev_cell(node, uav)
@@ -946,53 +932,9 @@ class MonteCarloTreeSearch():
             if node.uavs_energy_rem[uav] > self.energy_necessary(prev_cell,current_cell,next_cell):
                 moves.append(next_cell)
         return moves
-        
-    """def is_not_fully_expanded(self, node):
-        #Returns true if there is still a child to the node that has not been generated yet
-        move_priority = list(range(node.last_uav_idx+1, self.number_uavs)) + list(range(0,node.last_uav_idx+1))
-        for uav in move_priority:
-            #Check if the expected next UAV has enough energy available and if yes, expand for that one
-            number_moves = len(self.possible_moves(node, uav))
-            if number_moves > 0:
-                if len(node.children) < number_moves:
-                    return True
-                else:
-                    return False
-        return False #only if none of the uavs can move"""
-    
-    """def expand(self, node):
-        #From a not fully expanded node, find a new child
-        move_priority = list(range(node.last_uav_idx+1, self.number_uavs)) + list(range(0,node.last_uav_idx+1))
-        for uav in move_priority:
-            #Check if the expected next UAV has enough energy available and if yes, expand for that one
-            number_moves = len(self.possible_moves(node, uav))"""
-    
-    def best_child_UCT(self, node, C):
-        max_child = node.children[0]
-        max_value = max_child.Q/max_child.N + C*math.sqrt(2*math.log(node.N)/max_child.N)
-        
-        for child in node.children:
-            value = child.Q/child.N + C*math.sqrt(2*math.log(node.N)/child.N)
-            if max_value < value:
-                max_value = value
-                max_child = child
-        
-        return max_child
-    
-    def best_child_no_explored_check(self, node, C):
-        max_child = node.children[0]
-        max_value = max_child.Q_max + C*math.sqrt(2*math.log(node.N)/max_child.N)
-        
-        for child in node.children:
-            value = child.Q_max + C*math.sqrt(2*math.log(node.N)/child.N)
-            if max_value < value:
-                max_value = value
-                max_child = child
-        
-        return max_child
     
     def best_child(self, node, C):
-        #not_fully_explored_list = node.children
+        """Selects a child node according to the UCT tree policy, adapted for combinatorial search problems."""
         not_fully_explored_list = [aux_node for aux_node in node.children if aux_node.fully_explored == 0]
         
         max_child = not_fully_explored_list[0]
@@ -1007,6 +949,7 @@ class MonteCarloTreeSearch():
         return max_child
 
     def tree_policy(self, node):
+        """Performs the Selection and Expansion steps of the MCTS algorithm, traversing the tree and expanding a node when a leaf node is found."""
         current_node = node
         while self.is_not_terminal(current_node):
             
@@ -1019,7 +962,6 @@ class MonteCarloTreeSearch():
                     if len(possible_moves) > 0:
                         break #uav is now one that can move
             
-            #if len(current_node.children) < len(possible_moves): #check if all its possible moves have been performed
                 #Expand the node
                 positions = copy.deepcopy(current_node.cells_idx)
                 #Choose an action that will result in a child that hasnt been explored
@@ -1052,17 +994,9 @@ class MonteCarloTreeSearch():
                 current_node = self.best_child(current_node, self.c)
             
         return current_node
-            
-    """def tree_policy_slow(self, node):
-        current_node = node
-        while self.is_not_terminal(current_node):
-            if self.is_not_fully_expanded(current_node):
-                new_node = self.expand(current_node)
-                return new_node
-            else:
-                current_node = self.best_child(current_node)"""
     
     def get_paths_until_node(self, node):
+        """Returns the UAV paths that correspond to the tree node path that ends in node."""
         node_path = node.get_nodes_in_path()
         paths_idx = [[] for i in range(self.number_uavs)]
         
@@ -1075,96 +1009,9 @@ class MonteCarloTreeSearch():
             paths_idx[last_moved_uav].append(last_moved_cell)
         
         return paths_idx #Does not include -1
-        
-    def get_next_cell_RW(self, cell_idx):
-        #Finds the next cell to visit in the simulated path
-        next_cell_idx = random.choice(self.adj_dict[cell_idx])
-        return next_cell_idx
-
-    def attraction(self, cell1_idx, cell2_idx, visited_cells):
-        """Quantifies the attraction generated by cell2 on cell1"""
-        #times_covered_prev = len([i for i in visited_cells if i==cell2_idx])
-        
-        if cell1_idx == -1:
-            return (1-self.pod)**visited_cells[cell2_idx]*self.pod*self.valid_cell_list[cell2_idx].poc
-        #elif cell2_idx == -1:
-        #    return 0
-        
-        cell1 = self.valid_cell_list[cell1_idx]
-        cell2 = self.valid_cell_list[cell2_idx]
-        distance = math.sqrt((cell2.x - cell1.x)**2 + (cell2.y - cell1.y)**2)
-        #attraction = cell2.poc*cell2.not_covered/math.exp(distance/self.d)
-        
-        #attraction = cell2.poc*cell2.not_covered/(distance/self.d)
-        
-        #not_covered = not cell2_idx in visited_cells
-        #times_covered_prev = len([i for i in visited_cells if i==cell2_idx])
-        pos_cummulative = (1-self.pod)**visited_cells[cell2_idx]*self.pod*cell2.poc
-        
-        #bad initial guess
-        attraction = pos_cummulative*math.exp(-0.1*distance/self.d)
-        return attraction
     
-    def get_next_cell_att(self, cell_idx, visited_cells):
-        #Finds the next cell to visit in the simulated path
-        max_att = 0
-        for cell2_idx in range(len(self.valid_cell_list)):
-            if cell2_idx != cell_idx: #cell1.i != cell2.i or cell1.j != cell2.j:
-                att = self.attraction(cell_idx, cell2_idx, visited_cells)
-                if att> max_att:
-                    max_att = att
-                    max_idx = cell2_idx
-        
-        if cell_idx == -1:
-            return max_idx
-        
-        # Performs graph search to find the best path to it
-        traj_prob = TrajectoryProblem(self.valid_cell_list, self.valid_cell_list[cell_idx], self.valid_cell_list[max_idx])
-        solution, path = traj_prob.solve()
-        
-        next_cell = path[1].state
-        next_cell_idx, aux_cell = search_for_cell_ij(self.valid_cell_list, next_cell.i, next_cell.j)
-        
-        return next_cell_idx
-    
-    def get_next_cell_att_efficient(self, cell_idx, visited_cells, max_queue):
-        #Finds the next cell to visit in the simulated path
-        max_att = 0
-        for cell2_idx in max_queue[0:10]:
-            if cell2_idx != cell_idx: #cell1.i != cell2.i or cell1.j != cell2.j:
-                att = self.attraction(cell_idx, cell2_idx, visited_cells)
-                if att> max_att:
-                    max_att = att
-                    max_idx = cell2_idx
-        
-        if cell_idx == -1:
-            return max_idx, max_queue
-        
-        # Performs graph search to find the best path to it
-        traj_prob = TrajectoryProblem(self.valid_cell_list, self.valid_cell_list[cell_idx], self.valid_cell_list[max_idx])
-        solution, path = traj_prob.solve()
-        
-        next_cell = path[1].state
-        next_cell_idx, aux_cell = search_for_cell_ij(self.valid_cell_list, next_cell.i, next_cell.j)
-        
-        return next_cell_idx, max_queue
-    
-    def get_bias_toward_neighbour(self, cell2_idx, visited_cells):
-        """Quantifies the attraction generated by cell2 on cell1"""
-        times_covered_prev = len([i for i in visited_cells if i==cell2_idx])
-        return (1-self.pod)**times_covered_prev*self.pod*self.valid_cell_list[cell2_idx].poc
-    
-    def get_next_cell_RW_biased(self, cell_idx, visited_cells):
-        #Finds the next cell to visit in the simulated path
-        neighbours = self.adj_dict[cell_idx]
-        bias_neighbours = [(1-self.pod)**visited_cells[i]*self.pod*self.valid_cell_list[i].poc for i in neighbours]
-        if sum(bias_neighbours) == 0:
-            next_cell_idx = random.choice(neighbours)
-        else:
-            next_cell_idx = random.choices(neighbours, weights = bias_neighbours, k=1)[0]
-        return next_cell_idx
-    
-    def get_next_cell_RW_hard_biased(self, cell_idx, visited_cells):
+    def get_next_cell_greedy(self, cell_idx, visited_cells):
+        """Selects the cell with the highest POS among all of the neighbors of the cell with index cell_idx."""
         #Finds the next cell to visit in the simulated path
         neighbours = self.adj_dict[cell_idx]
         bias_neighbours = [(1-self.pod)**visited_cells[i]*self.pod*self.valid_cell_list[i].poc for i in neighbours]
@@ -1176,6 +1023,7 @@ class MonteCarloTreeSearch():
         return next_cell_idx
     
     def simulate_path_from_last_node(self, node):
+        """Generates a rollout during the Simulation step of the MCTS algorithm."""
         paths_idx = self.get_paths_until_node(node)
         energies_rem = copy.deepcopy(node.uavs_energy_rem)
         stopped_uavs = [0 for i in range(self.number_uavs)]
@@ -1207,20 +1055,10 @@ class MonteCarloTreeSearch():
                 prev_cell = paths_idx[uav][-2]
             
             
-            #if len(visited_cells) == len(self.valid_cell_list): #all the cells have been visited
-            #    break
-            #else:
-            
-            #next_cell = self.get_next_cell_RW(current_cell)
-            #next_cell = self.get_next_cell_att(current_cell, visited_cells)
-            #next_cell = self.get_next_cell_RW_biased(current_cell, visited_cells)
-            next_cell = self.get_next_cell_RW_hard_biased(current_cell, visited_cells)
-            #next_cell, max_queue = self.get_next_cell_att_efficient(current_cell, visited_cells, max_queue)
+            next_cell = self.get_next_cell_greedy(current_cell, visited_cells)
             
             energy_necessary = self.energy_necessary(prev_cell, current_cell, next_cell)
-            #turn = calculate_turn_from_actions(cell.prev_action, next_cell.prev_action)
-            #distance = math.sqrt((next_cell.x - cell.x)**2 + (next_cell.y - cell.y)**2)
-            #energy_necessary = self.turn_weight*turn + self.distance_weight*distance
+
             if energies_rem[uav] > energy_necessary:
                 energies_rem[uav] -= energy_necessary
                 paths_idx[uav].append(next_cell)
@@ -1228,19 +1066,11 @@ class MonteCarloTreeSearch():
                 stopped_uavs[uav] = 0
             else:
                 stopped_uavs[uav] = 1
-            #cell = copy.deepcopy(next_cell)
-            #print("Current cell: ", cell.i, cell.j)
             uav += 1
         return paths_idx
     
-    def default_policy_single_rollout(self, node):
-        #Simulate a case for the rest of the path
-        paths_idx = self.simulate_path_from_last_node(node)
-        #Calculate the objective function for these
-        reward = calculate_objective_multi(self.valid_cell_list, paths_idx, self.pod, self.factor)
-        return reward
-    
     def default_policy(self, node):
+        """Performs a rollout and calculates the objective function of the resulting UAV path."""
         rewards = []
         for _ in range(self.n_rollouts_per_sim):
             #Simulate a case for the rest of the path
@@ -1252,6 +1082,7 @@ class MonteCarloTreeSearch():
         return avg_rewards
     
     def backup_reward(self, current_node, reward):
+        """Propagates the reward obtained from the rollout to the nodes in the tree path."""
         aux_node = current_node
         while (aux_node is not None):
             aux_node.N = aux_node.N + 1
@@ -1279,9 +1110,7 @@ class MonteCarloTreeSearch():
                 if len(not_fully_explored_children) != 0:
                     aux_node.Q_max = max(child.Q_max for child in not_fully_explored_children)
                 aux_node = aux_node.parent
-        
-            
-        
+    
     def calculate_eff_branching_factor(self):
         d = self.sol_depth
         N = self.number_of_nodes
@@ -1293,6 +1122,7 @@ class MonteCarloTreeSearch():
         return eff_branching_factor
     
     def max_child(self, node):
+        """Policy used to traverse the tree after the MCTS termination condition was triggered, in order to find the best node path. Returns the child node that has the highest lower bound on the reward."""
         max_child = node.children[0]
         max_value = max_child.Q_max_max
         
@@ -1305,17 +1135,19 @@ class MonteCarloTreeSearch():
         return max_child
         
     def robust_child(self, node):
+        """Policy used to traverse the tree after the MCTS termination condition was triggered, in order to find the best node path."""
         n_visits_list = [child.N for child in node.children]
         max_visits_idx = n_visits_list.index(max(n_visits_list))
         aux_node = node.children[max_visits_idx]
         return aux_node
 
     def secure_child(self, node):
+        """Policy used to traverse the tree after the MCTS termination condition was triggered, in order to find the best node path."""
         max_child = node.children[0]
-        max_value = max_child.Q + self.A/math.sqrt(max_child.N)
+        max_value = max_child.Q_max_max + self.A/math.sqrt(max_child.N)
         
         for child in node.children:
-            value = child.Q + self.A/math.sqrt(child.N)
+            value = child.Q_max_max + self.A/math.sqrt(child.N)
             if max_value < value:
                 max_value = value
                 max_child = child
@@ -1324,6 +1156,7 @@ class MonteCarloTreeSearch():
         
     
     def generate_uav_path(self, time_limit, save_fig=0, fig_name=''):
+        """Generates the paths of available UAVs using the MCTS algorithm."""
         initial_cells = [-1 for i in range(self.number_uavs)]
         #Create the root node - all the UAVs are in a virtual cell that can access anywhere in the space
         root_node = MCS_Node(initial_cells, self.initial_energies, self.number_uavs-1)
@@ -1338,7 +1171,6 @@ class MonteCarloTreeSearch():
             reward = self.default_policy(current_node)
             self.backup_reward(current_node, reward)
             self.number_of_iterations += 1
-            #print(len(root_node.children))
             
         self.sol_depth = 0
         aux_node = root_node
@@ -1349,8 +1181,6 @@ class MonteCarloTreeSearch():
                 aux_node = self.robust_child(aux_node)
             elif self.final_node_selection == 2:
                 aux_node = self.secure_child(aux_node)
-            #aux_node.print()
-            #print(aux_node.cells_idx, aux_node.fully_expanded, aux_node.fully_explored)
             self.sol_depth += 1
         
         
@@ -1361,15 +1191,10 @@ class MonteCarloTreeSearch():
         else:
             self.paths_idx =  self.simulate_path_from_last_node(aux_node) #Perform a rollout from the last node
         
-        #self.paths_idx = self.get_paths_until_node(aux_node)
         self.paths = [[self.valid_cell_list[cell_idx] for cell_idx in path] for path in self.paths_idx]
-        #print(self.paths_idx)
-        #print("Total number of nodes explored: ", self.number_of_nodes)
-        #print("Total number of iterations: ", self.number_of_iterations)
-        #print("Effective branching factor: ", self.calculate_eff_branching_factor())
-        #print("Terminal state reached: ", terminal_state_reached)
+
         if save_fig==1:
-            f = open('./tese/code_var_poc/result_images/' + fig_name+'.txt', "a")
+            f = open('./results/' + fig_name+'.txt', "a")
             f.write("Using MCS algorithm with greedy tree policy Q_max not repeating nodes changing Q_max\n")
             f.write("c: " + str(self.c) + '\n')
             f.write("terminal state reached: " + str(self.terminal_state_reached) + '\n')
