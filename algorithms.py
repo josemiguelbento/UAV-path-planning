@@ -558,25 +558,24 @@ class SimulatedAnnealing():
         accepted_path = self.threads_paths[i]
         if save_res==1:
             f = open('./results/' + filename+'.txt', "a")
-            f.write("\nUsing the Simulated Annealing algorithmn\n")
+            f.write("Using the Simulated Annealing algorithm:\n\n")
             if self.type_init == 0:
                 f.write("Initial guess generated using the Attraction algorithm.\n")
             elif self.type_init == 1:
                 f.write("Initial guess generated using Random walk.\n")
-            f.write("Initial temp: " + str(self.initial_temp) + '\n')
+            f.write("T_init: " + str(self.initial_temp) + '\n')
             f.write("L_k: " + str(self.L_k) + '\n')
-            f.write("Final temp: " + str(self.final_temp) + '\n')
-            f.write("cooling factor: " + str(self.cooling_factor) + '\n')
-            f.write("Number of UAVs: " + str(self.number_uavs) + '\n')
-            f.write("Energies available: " + str(self.initial_energies) + '\n')
-            f.write("Number of threads: " + str(self.number_threads) + " Synchronism: "+ str(self.synchronism) + '\n')
-            f.write("Threads path J results: " + str(list(self.threads_paths_energy[0:self.number_threads])) + '\n')
-            f.write("Accepted path J: " + str(best_path_energy) + '\n')
-            f.write("Path accepted: " + str(accepted_path) + '\n')
-            f.write("Max thread processing time: " + str(max(self.threads_process_time)) + '\n')
-            f.write("Sum of threads processing time: " + str(sum(self.threads_process_time)) + '\n')
-            f.write("Max thread wall-clock time: " + str(max(self.threads_time)) + '\n')
-            f.write("Sum of threads wall-clock time: " + str(sum(self.threads_time)) + '\n')
+            f.write("T_min: " + str(self.final_temp) + '\n')
+            f.write("alpha: " + str(self.cooling_factor) + '\n')
+            f.write("Synchronism: "+ str(self.synchronism) + '\n')
+            f.write("Number of threads: " + str(self.number_threads) + '\n')
+            f.write("Objective function value J of the accepted paths of each thread: " + str([-i for i in list(self.threads_paths_energy[0:self.number_threads])]) + '\n')
+            f.write("Objective function value J of the final UAV paths: " + str(-best_path_energy) + '\n')
+            f.write("UAV paths described as indexes of the valid cell list: " + str(accepted_path) + '\n')
+            f.write("Max thread processing time (s): " + str(max(self.threads_process_time)) + '\n')
+            f.write("Sum of threads processing time (s): " + str(sum(self.threads_process_time)) + '\n')
+            f.write("Max thread wall-clock time (s): " + str(max(self.threads_time)) + '\n')
+            f.write("Sum of threads wall-clock time (s): " + str(sum(self.threads_time)) + '\n')
             f.close()
 
         self.paths_idx = copy.deepcopy(accepted_path)
@@ -670,15 +669,15 @@ class AntColonyOpt():
         
         if save_fig==1:
             f = open('./results/' + fig_name+'.txt', "a")
-            f.write("Using AntColonyOpt_v2 algorithm\n")
-            f.write("Paths: " + str(self.paths_idx) + '\n')
-            f.write("Total number of nodes explored: " + str(self.number_of_nodes) + '\n')
-            f.write("Q*max_iter = " + str(self.Q*self.max_iterations) + "\n")
-            f.write("Q = " + str(self.Q) + "\n")
-            f.write("max_iter = " + str(self.max_iterations) + "\n")
+            f.write("Using the Ant Colony Optimization algorithm:\n\n")
+            f.write("n_iter = " + str(self.max_iterations) + "\n")
             f.write("alpha = " + str(self.alpha) + "\n")
             f.write("beta = " + str(self.beta) + "\n")
-            f.write("evaporation = " + str(self.evaporation) + "\n")
+            f.write("rho = " + str(self.evaporation) + "\n")
+            f.write("Q = " + str(self.Q) + "\n")
+            f.write("eta_min = " + str(self.min_heuristic) + "\n")
+            f.write("Total number of nodes explored: " + str(self.number_of_nodes) + '\n')
+            f.write("UAV paths described as indexes of the valid cell list: " + str(self.paths_idx) + '\n')
             f.close()
         
         return self.paths
@@ -1195,14 +1194,15 @@ class MonteCarloTreeSearch():
 
         if save_fig==1:
             f = open('./results/' + fig_name+'.txt', "a")
-            f.write("Using MCS algorithm with greedy tree policy Q_max not repeating nodes changing Q_max\n")
-            f.write("c: " + str(self.c) + '\n')
-            f.write("terminal state reached: " + str(self.terminal_state_reached) + '\n')
-            f.write("number of rollouts per sim: " + str(self.n_rollouts_per_sim) + '\n')
-            f.write("Paths: " + str(self.paths_idx) + '\n')
+            f.write("Using the Monte Carlo Tree Search algorithm:\n\n")
+            f.write("C: " + str(self.c) + '\n')
+            f.write("max_runtime: " + str(time_limit) + '\n')
+            f.write("A terminal node was reached during the exploration: " + str(self.terminal_state_reached) + '\n')
+            f.write("Number of rollouts per simulation: " + str(self.n_rollouts_per_sim) + '\n')
             f.write("Total number of iterations: " + str(self.number_of_iterations) + '\n')
             f.write("Total number of nodes explored: " + str(self.number_of_nodes) + '\n')
             f.write("Effective branching factor: " + str(self.calculate_eff_branching_factor()) + "\n")
+            f.write("UAV paths described as indexes of the valid cell list: " + str(self.paths_idx) + '\n')
             f.close()
         
         return self.paths

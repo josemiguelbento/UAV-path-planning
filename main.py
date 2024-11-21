@@ -29,6 +29,7 @@ def main(algorithm, save_res, filename):
     #Create the mission object. If using the random mission generator, the following seeds are recommended:
     #[72, 28, 59, 76, 71, 41, 88, 63, 34, 29, 50, 37, 95, 22, 78, 23, 62]
     mission = Mission(mission_selection = 2, seed = 34, hfov = hfov, h_sensor = h_sensor, p_o = p_o)
+    random.seed(time.time()) #Using a random seed after using a fixed one for the mission generation
     
     start_grid = time.time()
     #Select if you want to use BO to optimize the grid placement
@@ -45,6 +46,23 @@ def main(algorithm, save_res, filename):
     else:
         print("Without grid placement optimization.")
     print("Total POC = "+"{:.2f}".format(100*sum(cell.poc for cell in cell_centers if cell.status == 1))+" % Grid comp. time = "+"{:.2f}".format(end_grid-start_grid)+"s\n"+"s_x = "+"{:.2f}".format(sx)+"m, s_y = "+"{:.2f}".format(sy) + "m, theta = "+"{:.2f}".format(theta*180/math.pi)+"deg")
+    
+    if save_res == 1:
+        f = open('./results/' + filename+'.txt', "w")
+        f.write("Mission definition:\n\n")
+        f.write("Number of UAVs employed: " + str(number_uavs) + '\n')
+        f.write("Energies available to the UAVs: " + str(energy_uavs) + '\n')
+        f.write("Altitude of the UAVs: " + str(h_sensor) + ' m\n')
+        f.write("FOV of the sensors: " + str(hfov) + ' deg\n')
+        f.write("Percentage of overlap: " + str(p_o) + ' %\n')
+        f.write("Probability of detection POD: " + str(pod*100) + ' %\n')
+        if optimize_grid:
+            f.write("Using Bayesian Optimization for grid placement with "+str(n_iter)+" iterations.\n")
+        else:
+            f.write("Without grid placement optimization.\n")
+        f.write("Total POC = "+"{:.2f}".format(100*sum(cell.poc for cell in cell_centers if cell.status == 1))+"% Grid comp. time = "+"{:.2f}".format(end_grid-start_grid)+"s\n")
+        f.write("Grid parameters: "+"s_x = "+"{:.2f}".format(sx)+"m, s_y = "+"{:.2f}".format(sy) + "m, theta = "+"{:.2f}".format(theta*180/math.pi)+"deg\n\n\n")
+        f.close()
     
     CG_grid, m = define_initial_grid(mission.AOI_vertices, mission.d, True)
     x_lims = (CG_grid[0] - m*mission.d/2, CG_grid[0] + m*mission.d/2)
@@ -63,7 +81,7 @@ def main(algorithm, save_res, filename):
         paths = Att.paths
         if save_res==1:
             f = open('./results/' + filename+'.txt', "a")
-            f.write("\nUsing the Uninformed Attraction algorithm.\n")
+            f.write("Using the Uninformed Attraction algorithm.\n")
             f.close()
             
     elif algorithm == 'Att':
@@ -72,7 +90,7 @@ def main(algorithm, save_res, filename):
         paths = Att.paths
         if save_res==1:
             f = open('./results/' + filename+'.txt', "a")
-            f.write("\nUsing the Attraction algorithm.\n")
+            f.write("Using the Attraction algorithm.\n")
             f.close()
             
     elif algorithm == 'SA':
@@ -90,7 +108,7 @@ def main(algorithm, save_res, filename):
         paths = ACO.generate_uav_path(save_res, filename)
     
     elif algorithm == 'MCTS':
-        max_runtime = 30
+        max_runtime = 200
         C_exploration = 1e-12
         MCTS = MonteCarloTreeSearch(cell_centers, d, energy_uavs, number_uavs, pod)
         MCTS.factor = decay_factor
@@ -133,13 +151,6 @@ def main(algorithm, save_res, filename):
     if save_res == 1:
         plt.savefig('./results/' + filename + '_paths.pdf', format = 'pdf', bbox_inches='tight')
         f = open('./results/' + filename+'.txt', "a")
-        if optimize_grid:
-            f.write("Using Bayesian Optimization for grid placement with "+str(n_iter)+" iterations.\n")
-        else:
-            f.write("Without grid placement optimization.\n")
-        f.write("Total POC = "+"{:.2f}".format(100*sum(cell.poc for cell in cell_centers if cell.status == 1))+"% Grid comp. time = "+"{:.2f}".format(end_grid-start_grid)+"s\n")
-        f.write("Grid parameters: "+"s_x = "+"{:.2f}".format(sx)+"m, s_y = "+"{:.2f}".format(sy) + "m, theta = "+"{:.2f}".format(theta*180/math.pi)+"deg")
-        
         f.write("Wall clock time for paths generation (s) = " + str(end-start) + "\n")
         f.close()
     
@@ -255,8 +266,8 @@ if __name__=='__main__':
         if save_res == 1:
             sftp = client.open_sftp()
             sftp.get("./UAV-path-planning/results/" + filename + '.txt', "./results/"+filename + '.txt')
-            sftp.get("./UAV-path-planning/results/" + filename + '_paths.pdf', "./results/"+filename + '.pdf')
-            sftp.get("./UAV-path-planning/results/" + filename + '_poc_map.pdf', "./results/"+filename + '.pdf')
+            sftp.get("./UAV-path-planning/results/" + filename + '_paths.pdf', "./results/"+filename + '_paths.pdf')
+            sftp.get("./UAV-path-planning/results/" + filename + '_poc_map.pdf', "./results/"+filename + '_poc_map.pdf')
             sftp.close()
         
         client.close()
