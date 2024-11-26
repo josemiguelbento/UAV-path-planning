@@ -77,14 +77,12 @@ The development of this repository was associated with the research conducted fo
 
 ```
 @InProceedings{Bento2024ROBOT,
-	author = {Bento, Jos{\'e}
-    and Basiri, Meysam
-    and Ventura, Rodrigo},
+	author = {Bento, Jos{\'e} and Basiri, Meysam and Ventura, Rodrigo},
 	title = "{Information-Oriented and Energy-Aware Path Planning for Multiple Air-Dropped Small Unmanned Aerial Vehicles}",
 	month = {November},
-    booktitle="2024 7th Iberian Robotics Conference (ROBOT)",
-    year="2024",
-    publisher="IEEE Xplore",
+    	booktitle="2024 7th Iberian Robotics Conference (ROBOT)",
+    	year="2024",
+    	publisher="IEEE Xplore",
 	note = {in press}
 }
 ```
